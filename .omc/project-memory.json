@@ -1,0 +1,414 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1779047168142,
+  "projectRoot": "/home/prad/Developer/github.com/hyper-auth/docs",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "agent-ready": {
+      "path": "agent-ready",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1779047168139,
+      "keyFiles": [
+        "contextual.mdx",
+        "prompt.mdx",
+        "visibility.mdx"
+      ]
+    },
+    "ai-tools": {
+      "path": "ai-tools",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1779047168140,
+      "keyFiles": [
+        "claude-code.mdx",
+        "cursor.mdx",
+        "windsurf.mdx"
+      ]
+    },
+    "api-reference": {
+      "path": "api-reference",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1779047168141,
+      "keyFiles": [
+        "introduction.mdx",
+        "openapi.json"
+      ]
+    },
+    "essentials": {
+      "path": "essentials",
+      "purpose": null,
+      "fileCount": 7,
+      "lastAccessed": 1779047168141,
+      "keyFiles": [
+        "code.mdx",
+        "components.mdx",
+        "images.mdx",
+        "markdown.mdx",
+        "navigation.mdx"
+      ]
+    },
+    "images": {
+      "path": "images",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1779047168141,
+      "keyFiles": [
+        "checks-passed.png",
+        "hero-dark.png",
+        "hero-light.png"
+      ]
+    },
+    "logo": {
+      "path": "logo",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1779047168141,
+      "keyFiles": [
+        "dark.svg",
+        "light.svg"
+      ]
+    },
+    "snippets": {
+      "path": "snippets",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1779047168141,
+      "keyFiles": [
+        "snippet-intro.mdx"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "docs.json",
+      "accessCount": 2,
+      "lastAccessed": 1779047591627,
+      "type": "file"
+    },
+    {
+      "path": "index.mdx",
+      "accessCount": 2,
+      "lastAccessed": 1779047607140,
+      "type": "file"
+    },
+    {
+      "path": "quickstart.mdx",
+      "accessCount": 2,
+      "lastAccessed": 1779047632902,
+      "type": "file"
+    },
+    {
+      "path": "development.mdx",
+      "accessCount": 2,
+      "lastAccessed": 1779047652007,
+      "type": "file"
+    },
+    {
+      "path": "api-reference/introduction.mdx",
+      "accessCount": 2,
+      "lastAccessed": 1779047925548,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/meta.json",
+      "accessCount": 1,
+      "lastAccessed": 1779047281276,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/index.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047281829,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/tutorials/quickstart.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047299847,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/tutorials/register-identity.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047300377,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/tutorials/sign-and-verify.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047301386,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/concepts/architecture.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047301905,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/guides/authentication.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047309649,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/guides/smart-accounts.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047310682,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/guides/ucan-delegation.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047311137,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/guides/vault-management.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047312119,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/guides/device-sync.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047312664,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/guides/payments.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047313108,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/guides/alias-lookup.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047314306,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/guides/deploy.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047314364,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/reference/sdk-client.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047321725,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/reference/react-hooks.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047325632,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/reference/ui-components.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047325861,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/reference/contracts.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047326021,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/reference/types.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047326183,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/reference/configuration.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047326300,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/concepts/did-model.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047326364,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/concepts/registration-flow.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047326553,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/concepts/security-model.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047326982,
+      "type": "file"
+    },
+    {
+      "path": ".to-migrate/concepts/smart-account-abstraction.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047327575,
+      "type": "file"
+    },
+    {
+      "path": "tutorials/register-identity.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047695196,
+      "type": "file"
+    },
+    {
+      "path": "tutorials/sign-and-verify.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047728717,
+      "type": "file"
+    },
+    {
+      "path": "guides/authentication.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047748452,
+      "type": "file"
+    },
+    {
+      "path": "guides/smart-accounts.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047769524,
+      "type": "file"
+    },
+    {
+      "path": "guides/ucan-delegation.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047781546,
+      "type": "file"
+    },
+    {
+      "path": "guides/vault-management.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047796033,
+      "type": "file"
+    },
+    {
+      "path": "guides/device-sync.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047808537,
+      "type": "file"
+    },
+    {
+      "path": "guides/payments.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047821016,
+      "type": "file"
+    },
+    {
+      "path": "guides/alias-lookup.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047835534,
+      "type": "file"
+    },
+    {
+      "path": "guides/deploy.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047854113,
+      "type": "file"
+    },
+    {
+      "path": "api-reference/static/enclave-wasm.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047928684,
+      "type": "file"
+    },
+    {
+      "path": "api-reference/stateless/contracts.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047938241,
+      "type": "file"
+    },
+    {
+      "path": "api-reference/stateless/bundler.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047942300,
+      "type": "file"
+    },
+    {
+      "path": "api-reference/stateless/status.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047945100,
+      "type": "file"
+    },
+    {
+      "path": "api-reference/stateless/accounts-predict.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047949298,
+      "type": "file"
+    },
+    {
+      "path": "api-reference/stateless/accounts-state.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047953520,
+      "type": "file"
+    },
+    {
+      "path": "api-reference/stateless/balance.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047960936,
+      "type": "file"
+    },
+    {
+      "path": "api-reference/stateless/sessions-status.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047963357,
+      "type": "file"
+    },
+    {
+      "path": "api-reference/lookups/dids-lookup.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047967365,
+      "type": "file"
+    },
+    {
+      "path": "api-reference/lookups/aliases-check.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047969950,
+      "type": "file"
+    },
+    {
+      "path": "api-reference/registration/sessions.mdx",
+      "accessCount": 1,
+      "lastAccessed": 1779047980031,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
