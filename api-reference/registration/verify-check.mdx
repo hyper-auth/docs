@@ -1,0 +1,45 @@
+---
+title: "POST /api/verify/check"
+description: "Verifies an OTP code for the identifier and returns a signed attestation."
+---
+
+Verifies an OTP code for the identifier. For email, the code is checked against DO-local SQLite; for SMS, it is checked against Twilio Verify.
+
+## Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `identifier` | `string` | Yes | Email address or phone number |
+| `channel` | `string` | Yes | `"email"` or `"sms"` |
+| `code` | `string` | Yes | OTP code submitted by user |
+
+## Response (200)
+
+```json
+{
+  "ok": true,
+  "verified": true,
+  "attestation": {
+    "identifier": "alice@example.com",
+    "channel": "email",
+    "verified_at": "2024-01-01T00:00:00Z",
+    "expires_at": "2024-01-01T00:05:00Z",
+    "registrar": "did:new:0x...",
+    "signature": "0x..."
+  }
+}
+```
+
+When `verified` is `false`, `attestation` is absent and a `message` field describes the failure reason.
+
+## Errors
+
+| Code | Condition | Description |
+|---|---|---|
+| `400` | `"Missing required fields: identifier, channel, code"` | Field absent |
+| `400` | `"Invalid channel. Must be \"sms\" or \"email\""` | Unknown channel |
+| `502` | `ok: false` | Upstream Twilio error |
+
+## Attestation lifetime
+
+The attestation is a signed JWT-like payload (HMAC-SHA256 keyed by `ATTESTATION_SIGNING_KEY`) that expires in 300 seconds (`ATTESTATION_TTL_SECONDS`). It is passed as `attestation` in the subsequent [`POST /api/dids`](/api-reference/registration/dids) call to prove ownership.

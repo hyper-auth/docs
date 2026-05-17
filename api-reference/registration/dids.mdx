@@ -1,0 +1,34 @@
+---
+title: "POST /api/dids"
+description: "Registers a DID after the identifier has been verified."
+---
+
+Registers a DID after the identifier has been verified. For non-handle channels, an `attestation` object must be present and is validated against the `ATTESTATION_SIGNING_KEY` before the DO call is made.
+
+## Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `credentialId` | `string` | Yes | WebAuthn credential ID |
+| `identifier` | `string` | Yes | Registration identifier (also accepts `handle` or `name`) |
+| `channel` | `string` | Yes | Channel type |
+| `did` | `string` | Yes | DID to register |
+| `txHash` | `string` | Yes | Transaction hash of the on-chain registration |
+| `blockNumber` | `number` | No | Block number of the transaction |
+| `smartAccount` | `string` | No | Smart account address |
+| `attestation` | `VerificationAttestation` | No | Required for non-handle channels |
+
+## Response (200)
+
+```json
+{ "ok": true, "identifier": "alice", "channel": "handle", "txHash": "0x..." }
+```
+
+## Errors
+
+| Code | `error` | Condition |
+|---|---|---|
+| `400` | `"Missing required fields: credentialId, identifier, channel, did, txHash"` | Field absent |
+| `403` | `"attestation_invalid"` | Attestation signature invalid |
+| `403` | `"attestation_mismatch"` | Attestation identifier/channel does not match request |
+| `409` | `"credential_already_registered"` | Credential ID already in `registered_dids` |

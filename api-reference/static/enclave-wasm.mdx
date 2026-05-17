@@ -1,0 +1,23 @@
+---
+title: "GET /enclave.wasm"
+description: "Returns the enclave WASM binary."
+---
+
+Returns the enclave WASM binary.
+
+The worker first checks R2 (`CDN_ASSETS`) for `enclave/latest/enclave.wasm`. If absent, it falls back to the `ASSETS` static binding.
+
+## Response headers
+
+| Header | Value |
+|---|---|
+| `Content-Type` | `application/wasm` |
+| `Cache-Control` | `public, max-age=3600, s-maxage=86400` |
+
+## Example
+
+```bash
+curl -s https://did.run/enclave.wasm -o enclave.wasm
+file enclave.wasm
+# enclave.wasm: WebAssembly (wasm) binary module ...
+```

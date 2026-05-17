@@ -1,0 +1,30 @@
+---
+title: "GET /api/aliases/check"
+description: "Checks whether a handle alias is available for registration."
+---
+
+Checks whether a handle alias is available for registration. Queries the global `SESSION_DB` D1 database directly.
+
+## Query parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `alias` | `string` | Yes | Handle to check (lowercased before lookup) |
+
+## Response — available
+
+```json
+{ "available": true }
+```
+
+## Response — taken
+
+```json
+{ "available": false, "did": "did:new:0x..." }
+```
+
+## Errors
+
+| Code | `error` | Condition |
+|---|---|---|
+| `400` | `"Missing query parameter: alias"` | Parameter absent |

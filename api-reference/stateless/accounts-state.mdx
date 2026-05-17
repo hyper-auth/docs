@@ -1,0 +1,32 @@
+---
+title: "GET /api/accounts/state"
+description: "Returns decoded on-chain state for a smart account: nonce, DID, active status, and public key coordinates."
+---
+
+Calls `getAccountState` on the `accountHelper` contract and decodes the ABI-encoded response (5 × 32-byte slots: nonce, did, isActive, pubKeyX, pubKeyY).
+
+## Query parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `account` | `string` | Yes | 20-byte EVM address |
+
+## Response (200)
+
+```json
+{
+  "nonce": "0",
+  "did": "0x...",
+  "isActive": true,
+  "pubKeyX": "0x...",
+  "pubKeyY": "0x..."
+}
+```
+
+## Errors
+
+| Code | `error` | Condition |
+|---|---|---|
+| `400` | `"Missing query parameter: account"` | Parameter absent |
+| `400` | `"Invalid account: expected 20-byte hex address"` | Address invalid |
+| `502` | `"rpc_error"` | Upstream eth_call failure |

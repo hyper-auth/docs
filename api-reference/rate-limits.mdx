@@ -1,0 +1,19 @@
+---
+title: "Rate Limits and Constants"
+description: "All rate limits, attestation TTLs, and worker constants in one place."
+---
+
+All quotas and constants applied by the Vault Worker and its Durable Object instances.
+
+| Constant | Value | Applies to |
+|---|---|---|
+| `MAX_REGISTRATIONS_PER_IP` | `3` | [`POST /api/sessions`](/api-reference/registration/sessions) |
+| `MAX_VERIFY_ATTEMPTS` | `5` | [`POST /api/verify/check`](/api-reference/registration/verify-check) per code (email) |
+| `EMAIL_CODE_EXPIRY_SECONDS` | `90` | Email OTP TTL |
+| `RATE_LIMIT_CODES_PER_IDENTIFIER` | `5` | [`POST /api/verify/send`](/api-reference/registration/verify-send) per identifier per hour (email) |
+| `MAX_VERIFY_SENDS_PER_IP` | `3` | [`POST /api/verify/send`](/api-reference/registration/verify-send) per IP per day |
+| `ATTESTATION_TTL_SECONDS` | `300` | Verification attestation TTL |
+
+<Note>
+  IP-based limits use the `CF-Connecting-IP` header, which Cloudflare sets to the originating client IP. Limits reset on rolling windows tied to the limit type (per hour, per day, etc.).
+</Note>

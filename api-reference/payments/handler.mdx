@@ -1,0 +1,34 @@
+---
+title: "Payment Handler"
+description: "Web Payment Handler API endpoints — service worker, confirmation page, and method manifest."
+---
+
+These endpoints support the [Web Payment Handler API](https://www.w3.org/TR/payment-handler/).
+
+## `GET /pay/sw.js`
+
+Returns the payment service worker JavaScript file. Sets `Service-Worker-Allowed: /pay/` to authorize the service worker scope.
+
+## `GET /pay/confirm`
+
+Returns the payment confirmation HTML page (`/pay/confirm.html` from the static `ASSETS` binding).
+
+## `GET /pay/manifest.json`
+
+Returns the Web App Manifest for the payment handler.
+
+## `GET /pay/payment-method.json`
+
+Returns the payment method manifest. Declares a single `webapp` application pointing to `/pay/manifest.json`.
+
+```json
+{
+  "default_applications": [
+    { "platform": "webapp", "manifest_url": "/pay/manifest.json" }
+  ]
+}
+```
+
+## `GET /.well-known/payment-method-manifest`
+
+Redirects (`302`) to `/pay/payment-method.json`.

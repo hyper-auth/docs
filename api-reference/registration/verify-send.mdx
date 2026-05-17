@@ -1,0 +1,29 @@
+---
+title: "POST /api/verify/send"
+description: "Sends a verification code to the identifier via the specified channel. Email is delivered via Resend; SMS via Twilio Verify."
+---
+
+Sends a verification code to the identifier via the specified channel. Email is delivered via Resend; SMS via Twilio Verify.
+
+## Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `identifier` | `string` | Yes | Email address or phone number |
+| `channel` | `string` | Yes | `"email"` or `"sms"` |
+
+## Response (200)
+
+```json
+{ "ok": true, "channel": "email" }
+```
+
+## Errors
+
+| Code | `error` | Condition |
+|---|---|---|
+| `400` | `"Missing required fields: identifier, channel"` | Field absent |
+| `400` | `"Invalid channel. Must be \"sms\" or \"email\""` | Unknown channel |
+| `429` | `"rate_limited"` | IP exceeded `MAX_VERIFY_SENDS_PER_IP` (3/day) or identifier exceeded `RATE_LIMIT_CODES_PER_IDENTIFIER` (5/hour, email only) |
+| `502` | `"sms_send_failed"` | Twilio API error |
+| `502` | `"email_send_failed"` | Resend API error |

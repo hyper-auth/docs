@@ -1,0 +1,25 @@
+---
+title: "GET /api/contracts"
+description: "Returns the default smart contract addresses for Base Sepolia (chain ID 84532)."
+---
+
+Returns the default smart contract addresses for Base Sepolia (chain ID `84532`).
+
+## Response
+
+```json
+{
+  "chainId": 84532,
+  "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+  "didRegistry": "0xd38972ffea26b66f09e2109e650887acd447e7b7",
+  "accountHelper": "0xd4d57cc363dd419cd95712eb5cddf1797ceb9dde",
+  "sessionSBT": "0x5a2822bd69aa3799232ac57decf2b07e3fed1881",
+  "hyperAuthFactory": "0xb797f4799d8aa218e9207f918fdea3afc76b1e18"
+}
+```
+
+## Response headers
+
+| Header | Value |
+|---|---|
+| `Cache-Control` | `public, max-age=86400` |

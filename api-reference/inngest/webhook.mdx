@@ -1,0 +1,12 @@
+---
+title: "Inngest webhook"
+description: "Serves the Inngest webhook handler. All methods are forwarded to the Inngest SDK's serve() handler."
+---
+
+## `* /api/inngest`
+
+Serves the Inngest webhook handler. All methods are forwarded to the Inngest SDK's `serve()` handler, which manages event registration and function execution callbacks.
+
+<Note>
+  This endpoint is intended to be called by the Inngest service, not by application code directly. Configure the Inngest dashboard with this URL after deploying the Vault Worker.
+</Note>

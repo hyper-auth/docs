@@ -1,0 +1,26 @@
+---
+title: "GET /api/verify/status"
+description: "Returns the verification state for an identifier and channel."
+---
+
+Returns the verification state for an identifier and channel.
+
+## Query parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `identifier` | `string` | Yes | Email address or phone number |
+| `channel` | `string` | Yes | `"email"` or `"sms"` |
+
+## Response (200)
+
+```json
+{
+  "identifier": "alice@example.com",
+  "channel": "email",
+  "verified": true,
+  "verifiedAt": "2024-01-01T00:00:00Z"
+}
+```
+
+`verifiedAt` is `null` when `verified` is `false`.

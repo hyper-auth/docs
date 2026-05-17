@@ -1,0 +1,19 @@
+---
+title: "GET /api/status"
+description: "Returns the current operational status of the chain and database. Served with CORS headers."
+---
+
+Returns the current operational status of the chain and database. Served with CORS headers (used by widget embeds cross-origin).
+
+## Response
+
+```json
+{
+  "chain": "Base Sepolia",
+  "chainId": 84532,
+  "rpc": "https://sepolia.base.org",
+  "database": "connected"
+}
+```
+
+`database` is `"connected"` when a `SELECT 1` against `SESSION_DB` succeeds, otherwise `"unavailable"`.

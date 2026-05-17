@@ -1,0 +1,31 @@
+---
+title: "POST /api/sessions"
+description: "Creates a registration session for an identifier. Checks reserved identifiers, duplicate registrations, and per-IP registration limits before writing to D1."
+---
+
+Creates a registration session for an identifier. Checks reserved identifiers, duplicate registrations, and per-IP registration limits before writing to D1.
+
+The route extracts the identifier from the request body, resolves the `Vault` Durable Object by name (`env.VAULT.getByName(identifier)`), and calls the corresponding RPC method on the DO instance.
+
+## Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `identifier` | `string` | Yes | Registration identifier (also accepts `handle`) |
+| `channel` | `string` | Yes | Channel type (also inferred as `"handle"` if only `handle` field is present) |
+| `did` | `string` | Yes | DID to associate |
+
+## Response (200)
+
+```json
+{ "ok": true, "identifier": "alice", "channel": "handle", "did": "did:new:0x..." }
+```
+
+## Errors
+
+| Code | `error` | Condition |
+|---|---|---|
+| `400` | `"Missing required fields: identifier, channel, did"` | Field absent |
+| `409` | `"identifier_reserved"` | Identifier is in reserved list |
+| `409` | `"identifier_taken"` | Identifier already registered |
+| `429` | `"ip_limit_reached"` | IP has reached `MAX_REGISTRATIONS_PER_IP` (3) |

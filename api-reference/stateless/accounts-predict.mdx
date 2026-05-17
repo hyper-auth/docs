@@ -1,0 +1,29 @@
+---
+title: "GET /api/accounts/predict"
+description: "Predicts the counterfactual smart account address for a given P-256 public key and salt."
+---
+
+Calls `getAddress` on the `hyperAuthFactory` contract to predict the counterfactual smart account address for a given P-256 public key and salt.
+
+## Query parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `pubKeyX` | `string` | Yes | P-256 X coordinate as uint256 hex string |
+| `pubKeyY` | `string` | Yes | P-256 Y coordinate as uint256 hex string |
+| `salt` | `string` | No | uint256 decimal or hex string (default: `0`) |
+
+## Response (200)
+
+```json
+{ "address": "0x..." }
+```
+
+## Errors
+
+| Code | `error` | Condition |
+|---|---|---|
+| `400` | `"Missing query parameters: pubKeyX, pubKeyY"` | Parameters absent |
+| `400` | `"Invalid pubKeyX or pubKeyY: expected uint256 hex string"` | Decode failure |
+| `400` | `"Invalid salt: expected uint256 decimal or hex string"` | Salt parse failure |
+| `502` | `"rpc_error"` | Upstream eth_call failure |

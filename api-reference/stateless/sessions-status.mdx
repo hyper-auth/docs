@@ -1,0 +1,18 @@
+---
+title: "GET /api/sessions/status"
+description: "Returns registration counts for the requesting IP address and globally."
+---
+
+Returns registration counts for the requesting IP address and globally. IP is extracted from the `CF-Connecting-IP` header.
+
+## Response (200)
+
+```json
+{
+  "ip_registrations": 1,
+  "ip_limit": 3,
+  "total_registrations": 42
+}
+```
+
+`ip_limit` is always `3` (the `MAX_REGISTRATIONS_PER_IP` constant). See [Rate Limits](/api-reference/rate-limits).

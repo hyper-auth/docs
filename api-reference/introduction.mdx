@@ -1,33 +1,47 @@
 ---
-title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+title: "Introduction"
+description: "Vault HTTP API. Per-identifier routes are served by a Durable Object; global and stateless routes are served by the Cloudflare Worker directly."
+icon: "book-open"
 ---
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+The Vault is a Cloudflare Worker deployed at the root of the `did.run` domain. It routes per-identifier requests to a Durable Object (the `Vault` DO, one instance per registration identifier) and handles stateless and global operations directly. All responses are JSON unless noted otherwise, and all endpoints are served with CORS headers.
 
-## Welcome
+## Endpoint groups
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+<CardGroup cols={2}>
+  <Card title="Static / CDN" icon="hard-drive" href="/api-reference/static/enclave-wasm">
+    Serves the enclave WASM binary.
+  </Card>
+  <Card title="Stateless" icon="bolt" href="/api-reference/stateless/contracts">
+    Read-only operations that do not touch a Durable Object: contracts, bundler proxy, balance, status.
+  </Card>
+  <Card title="Global Lookups" icon="magnifying-glass" href="/api-reference/lookups/dids-lookup">
+    Resolve credential IDs to DIDs and check alias availability via the global D1 database.
+  </Card>
+  <Card title="Registration" icon="user-plus" href="/api-reference/registration/sessions">
+    Per-identifier endpoints that route to a Durable Object: session creation, verification, DID registration.
+  </Card>
+  <Card title="Indexer" icon="database" href="/api-reference/indexer/proxy">
+    Proxy for the upstream indexer service with an allowlist.
+  </Card>
+  <Card title="Payments" icon="credit-card" href="/api-reference/payments/handler">
+    Web Payment Handler API endpoints for the browser-native payment flow.
+  </Card>
+</CardGroup>
 
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
+## Conventions
 
-## Authentication
+- All responses use `application/json` unless explicitly stated otherwise.
+- Errors return a non-2xx status and a body of the form `{ "error": "<code>" }` unless otherwise noted.
+- CORS headers are returned on every response. Cross-origin embeds (widgets, payment handlers) are supported.
+- IP-based rate limits are derived from the `CF-Connecting-IP` header. See [Rate Limits](/api-reference/rate-limits) for the full table.
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+## Routing model
 
-```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
-```
+The worker uses three routing layers:
+
+| Layer | Backed by | Examples |
+|---|---|---|
+| Static asset | R2 (`CDN_ASSETS`) or `ASSETS` binding | `GET /enclave.wasm`, `GET /pay/*` |
+| Stateless / global | Worker, with `SESSION_DB` (D1) for lookups | `GET /api/contracts`, `GET /api/dids/lookup` |
+| Per-identifier | `Vault` Durable Object instance, keyed by registration identifier | `POST /api/sessions`, `POST /api/verify/send` |

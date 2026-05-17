@@ -1,0 +1,44 @@
+---
+title: "GET /api/balance"
+description: "Returns the native ETH or USDC balance for an address on a given chain."
+---
+
+Returns the native ETH or USDC balance for an address on a given chain.
+
+## Query parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `account` | `string` | Yes | 20-byte EVM address |
+| `token` | `string` | Yes | `"ETH"` or `"USDC"` (case-insensitive) |
+| `chainId` | `string` | Yes | Integer chain ID |
+
+## Supported chains
+
+| Chain ID | Network | USDC address |
+|---|---|---|
+| `84532` | Base Sepolia | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+| `8453` | Base Mainnet | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` |
+
+## Response (200)
+
+```json
+{
+  "balance": "1000000",
+  "decimals": 6,
+  "symbol": "USDC",
+  "formatted": "1.000000"
+}
+```
+
+For ETH, `decimals` is `18` and `symbol` is `"ETH"`.
+
+## Errors
+
+| Code | `error` | Condition |
+|---|---|---|
+| `400` | `"Missing query parameters: account, token, chainId"` | Parameter absent |
+| `400` | `"Unsupported token. Supported: ETH, USDC"` | Unknown token |
+| `400` | `"Unsupported chainId"` | Chain not in supported list |
+| `400` | `"USDC not available on this chain"` | USDC address not known |
+| `502` | `"rpc_error"` | Upstream eth_call failure |

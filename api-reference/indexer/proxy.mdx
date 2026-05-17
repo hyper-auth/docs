@@ -1,0 +1,27 @@
+---
+title: "GET /api/indexer/{path}"
+description: "Proxies requests to the upstream indexer service. The /api/indexer prefix is stripped and the remainder is forwarded."
+---
+
+Proxies requests to the upstream indexer service. The `/api/indexer` prefix is stripped and the remainder is forwarded.
+
+## Allowed downstream paths
+
+| Path |
+|---|
+| `/api/dids` |
+| `/api/aliases` |
+| `/api/accounts` |
+| `/api/stats` |
+| `/api/events` |
+| `/health` |
+
+Requests to any other path return `404`. The upstream is resolved via the `INDEXER` service binding (if configured) or the `INDEXER_URL` environment variable.
+
+## Status codes
+
+| Code | Condition |
+|---|---|
+| `404` | Path not in allowlist |
+| `503` | Neither `INDEXER` binding nor `INDEXER_URL` is configured |
+| `*` | Upstream status forwarded as-is |

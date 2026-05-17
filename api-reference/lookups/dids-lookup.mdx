@@ -1,0 +1,39 @@
+---
+title: "GET /api/dids/lookup"
+description: "Resolves a WebAuthn credential ID to a registered on-chain DID."
+---
+
+Resolves a WebAuthn credential ID to a registered on-chain DID. Queries the global `SESSION_DB` D1 database directly — does not route to a Durable Object.
+
+## Query parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `credentialId` | `string` | Yes | WebAuthn credential ID |
+
+## Response — found
+
+```json
+{
+  "found": true,
+  "identifier": "alice",
+  "channel": "handle",
+  "did": "did:new:0x...",
+  "txHash": "0x...",
+  "blockNumber": 12345678,
+  "smartAccount": "0x...",
+  "createdAt": "2024-01-01T00:00:00Z"
+}
+```
+
+## Response — not found
+
+```json
+{ "found": false }
+```
+
+## Errors
+
+| Code | `error` | Condition |
+|---|---|---|
+| `400` | `"Missing query parameter: credentialId"` | Parameter absent |
