@@ -1,0 +1,298 @@
+---
+title: "Sign and Verify Data"
+description: "Sign arbitrary data with your HyperAuth identity and derive a blockchain address from the same key."
+icon: "signature"
+---
+
+In this tutorial you'll sign a message using the encrypted key shares produced during registration, examine the raw signature bytes, and derive a blockchain address from the same public key. By the end you'll have a working `SigningDemo` component that lets a user sign any text they type and shows them the hex-encoded signature and their Ethereum address — all without the private key ever leaving the vault worker.
+
+## What you'll build
+
+A `SigningDemo` component that:
+
+1. Loads the encrypted shares from a previous `generate()` call.
+2. Signs a user-supplied message with `client.sign()`.
+3. Displays the hex-encoded signature.
+4. Calls `client.deriveAddress()` to show the corresponding Ethereum address.
+
+## Prerequisites
+
+- You have completed the [Quickstart](/quickstart) tutorial.
+- You have a `GenerateResult` from a call to `client.generate()`. You'll store it in React state exactly as the Quickstart does.
+
+## Steps
+
+<Steps>
+  <Step title="Understand what sign() needs">
+    `client.sign()` takes two arguments:
+
+    ```ts
+    client.sign(
+      encryptedShares: EncryptedShares,  // from client.generate() → result.shares
+      data: number[],                    // the raw bytes to sign
+    ): Promise<SignResult>
+    ```
+
+    `SignResult` has a single field:
+
+    ```ts
+    interface SignResult {
+      signature: number[];  // raw signature bytes
+    }
+    ```
+
+    The `encryptedShares` value is opaque — you do not need to inspect it. You receive it from `generate()` and hand it back to `sign()`. The vault worker handles all key material internally; your application code never touches a private key.
+
+    The `data` argument is a plain array of bytes. You'll convert a UTF-8 string into `number[]` using `TextEncoder`.
+  </Step>
+
+  <Step title="Store the generate result in state">
+    Extend the `App` component from the Quickstart to keep the `GenerateResult` in state after passkey creation, then pass it down to `SigningDemo`.
+
+    Replace the contents of `src/App.tsx`:
+
+    ```tsx src/App.tsx
+    import { useState } from 'react';
+    import { useHyperAuth } from '@hyperauth/react';
+    import { createPasskey } from '@hyperauth/sdk';
+    import type { GenerateResult } from '@hyperauth/sdk';
+    import { SigningDemo } from './SigningDemo';
+
+    export default function App() {
+      const { client, status } = useHyperAuth();
+      const [identity, setIdentity] = useState<GenerateResult | null>(null);
+      const [busy, setBusy] = useState(false);
+
+      if (status === 'initializing') return <p>Loading...</p>;
+      if (status === 'error') return <p>Failed to initialise HyperAuth.</p>;
+
+      async function handleGenerate() {
+        if (!client) return;
+        setBusy(true);
+        try {
+          const { credential } = await createPasskey('demo-user');
+          const result = await client.generate(credential, { identifier: 'demo-user' });
+          setIdentity(result);
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      if (!identity) {
+        return (
+          <main>
+            <h1>Sign and Verify Data</h1>
+            <button onClick={handleGenerate} disabled={busy}>
+              {busy ? 'Creating identity...' : 'Create identity with passkey'}
+            </button>
+          </main>
+        );
+      }
+
+      return (
+        <main>
+          <h1>Sign and Verify Data</h1>
+          <p>Identity ready. DID: <code>{identity.did}</code></p>
+          <SigningDemo client={client!} identity={identity} />
+        </main>
+      );
+    }
+    ```
+
+    `identity.shares` is the value you'll carry through to signing. It is typed as `EncryptedShares & { enclave_id: string }`, and you pass the entire `identity` object to `SigningDemo` so it can reach both `shares` and `shares.public_key_hex`.
+  </Step>
+
+  <Step title="Create the SigningDemo component">
+    Create `src/SigningDemo.tsx`:
+
+    ```tsx src/SigningDemo.tsx
+    import { useState } from 'react';
+    import type { HyperAuthClient, GenerateResult } from '@hyperauth/sdk';
+
+    interface Props {
+      client: HyperAuthClient;
+      identity: GenerateResult;
+    }
+
+    export function SigningDemo({ client, identity }: Props) {
+      const [message, setMessage] = useState('Hello, HyperAuth!');
+      const [signature, setSignature] = useState<string | null>(null);
+      const [address, setAddress] = useState<string | null>(null);
+      const [busy, setBusy] = useState(false);
+      const [error, setError] = useState<string | null>(null);
+
+      async function handleSign() {
+        setBusy(true);
+        setError(null);
+        setSignature(null);
+        setAddress(null);
+
+        try {
+          const bytes = Array.from(new TextEncoder().encode(message));
+          const result = await client.sign(identity.shares, bytes);
+          const hex = '0x' + result.signature.map((b) => b.toString(16).padStart(2, '0')).join('');
+          setSignature(hex);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : String(err));
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      return (
+        <div>
+          <label htmlFor="message">Message to sign</label>
+          <input
+            id="message"
+            type="text"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            disabled={busy}
+          />
+          <button onClick={handleSign} disabled={busy || !message.trim()}>
+            {busy ? 'Signing...' : 'Sign message'}
+          </button>
+
+          {signature && <SignatureDisplay signature={signature} />}
+          {error && <p role="alert" style={{ color: 'red' }}>{error}</p>}
+        </div>
+      );
+    }
+    ```
+  </Step>
+
+  <Step title="Display the signature">
+    Add `SignatureDisplay` to the same file:
+
+    ```tsx src/SigningDemo.tsx
+    function SignatureDisplay({ signature }: { signature: string }) {
+      return (
+        <div>
+          <h3>Signature</h3>
+          <pre style={{ wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+            {signature}
+          </pre>
+          <p>
+            This is the raw ECDSA signature over your message bytes, produced
+            entirely inside the vault worker.
+          </p>
+        </div>
+      );
+    }
+    ```
+
+    You'll see a long hex string like:
+
+    ```
+    0x3045022100e4b8...af3d02206c1f...
+    ```
+
+    <Note>
+      That is the DER-encoded ECDSA signature. The bytes are produced by the enclave WASM and returned to your component — the signing key itself never crosses the worker boundary.
+    </Note>
+  </Step>
+
+  <Step title="Derive the Ethereum address">
+    Now add address derivation. `client.deriveAddress()` takes the public key hex string and a chain name:
+
+    ```ts
+    client.deriveAddress(
+      publicKeyHex: string,  // from identity.shares.public_key_hex
+      chain: string,         // e.g. 'ethereum'
+    ): Promise<DeriveAddressResult>
+    ```
+
+    `DeriveAddressResult` has two fields:
+
+    ```ts
+    interface DeriveAddressResult {
+      address: string;
+      chain: string;
+    }
+    ```
+
+    Add a second button to `SigningDemo`, below the sign button:
+
+    ```tsx src/SigningDemo.tsx
+    async function handleDeriveAddress() {
+      setBusy(true);
+      setError(null);
+      try {
+        const publicKeyHex = identity.shares.public_key_hex;
+        if (!publicKeyHex) {
+          throw new Error('No public_key_hex in identity shares');
+        }
+        const result = await client.deriveAddress(publicKeyHex, 'ethereum');
+        setAddress(result.address);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusy(false);
+      }
+    }
+    ```
+
+    The complete updated return statement for `SigningDemo`:
+
+    ```tsx src/SigningDemo.tsx
+    return (
+      <div>
+        <label htmlFor="message">Message to sign</label>
+        <input
+          id="message"
+          type="text"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          disabled={busy}
+        />
+
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+          <button onClick={handleSign} disabled={busy || !message.trim()}>
+            {busy ? 'Working...' : 'Sign message'}
+          </button>
+          <button onClick={handleDeriveAddress} disabled={busy}>
+            Derive Ethereum address
+          </button>
+        </div>
+
+        {signature && <SignatureDisplay signature={signature} />}
+
+        {address && (
+          <div>
+            <h3>Ethereum address</h3>
+            <code>{address}</code>
+          </div>
+        )}
+
+        {error && <p role="alert" style={{ color: 'red' }}>{error}</p>}
+      </div>
+    );
+    ```
+  </Step>
+
+  <Step title="Run the demo">
+    Start the dev server:
+
+    ```bash
+    npm run dev
+    ```
+
+    Open the app, click **Create identity with passkey**, and complete the WebAuthn prompt. You'll see:
+
+    ```
+    Identity ready. DID: did:key:z6Mk...
+    ```
+
+    Type a message in the input field and click **Sign message**. Within a second the hex signature appears below. Then click **Derive Ethereum address** to see the address that corresponds to your passkey's public key.
+
+    <Check>
+      Both operations are instant after the first one — the enclave is already loaded and the shares are already in memory. Neither button triggers a network request; all cryptographic work happens inside the vault worker.
+    </Check>
+  </Step>
+</Steps>
+
+## What you have built
+
+You can now sign and verify data with your HyperAuth identity. `client.sign()` takes your encrypted shares and any byte array and returns a raw ECDSA signature. `client.deriveAddress()` turns the same public key into a chain-specific address. Neither operation requires a server, a seed phrase, or any key material in your application code.
+
+From here you can explore more advanced capabilities: the [UCAN Delegation guide](/guides/ucan-delegation) shows how to mint capability tokens using `client.mintUcan()`, and the [Smart Accounts guide](/guides/smart-accounts) shows how the address you derived becomes the owner of an ERC-4337 account.

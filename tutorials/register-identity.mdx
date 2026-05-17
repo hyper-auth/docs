@@ -1,0 +1,244 @@
+---
+title: "Build a Registration Flow"
+description: "Build a complete identity registration flow using the useRegistration hook and its 12 progress phases."
+icon: "user-plus"
+---
+
+In this tutorial you'll build a complete identity registration UI using the `useRegistration` hook. A user will type an alias, click a button, and watch their registration progress through every step — from alias availability check all the way to on-chain confirmation. By the end you'll have a full registration form that provides real-time feedback and displays the final transaction hash and DID when registration succeeds.
+
+## What you'll build
+
+A `RegistrationForm` component that:
+
+1. Accepts an alias from the user.
+2. Calls `register(alias)` from `useRegistration`.
+3. Displays a live progress list that updates as each of the 12 phases completes.
+4. Shows the registration result — DID, smart account address, and transaction hash — on success.
+
+## Prerequisites
+
+- You have completed the [Quickstart](/quickstart) tutorial. Your app already has `HyperAuthProvider` wrapping its root.
+
+## Steps
+
+<Steps>
+  <Step title="Understand the registration phases">
+    Before writing any UI code, look at what `useRegistration` tracks under the hood. The hook moves through these 12 steps in order:
+
+    | # | Label | Phase value |
+    |---|---|---|
+    | 0 | Checking availability | `checking-alias` |
+    | 1 | Creating passkey | `creating-passkey` |
+    | 2 | Generating identity | `generating-identity` |
+    | 3 | Predicting account | `predicting-account` |
+    | 4 | Checking account state | `fetching-account-state` |
+    | 5 | Preparing registration | `creating-registration` |
+    | 6 | Covering fees | `sponsoring` |
+    | 7 | Granting permissions | `authorizing` |
+    | 8 | Signing securely | `signing` |
+    | 9 | Submitting registration | `submitting` |
+    | 10 | Waiting for confirmation | `confirming` |
+    | 11 | Saving session | `storing-session` |
+
+    Each step has a `status` of `'pending'`, `'active'`, `'done'`, or `'error'`. You'll use these to render a live checklist.
+  </Step>
+
+  <Step title="Create the RegistrationForm component">
+    Create a new file `src/RegistrationForm.tsx`:
+
+    ```tsx src/RegistrationForm.tsx
+    import { useState } from 'react';
+    import { useRegistration } from '@hyperauth/react';
+
+    export function RegistrationForm() {
+      const [alias, setAlias] = useState('');
+      const { register, reset, phase, steps, identity, result, error, isRegistering } =
+        useRegistration();
+
+      async function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!alias.trim()) return;
+        await register(alias.trim());
+      }
+
+      return (
+        <div>
+          <form onSubmit={handleSubmit}>
+            <label htmlFor="alias">Choose an alias</label>
+            <input
+              id="alias"
+              type="text"
+              value={alias}
+              onChange={(e) => setAlias(e.target.value)}
+              placeholder="e.g. alice"
+              disabled={isRegistering}
+            />
+            <button type="submit" disabled={isRegistering || !alias.trim()}>
+              {isRegistering ? 'Registering...' : 'Register'}
+            </button>
+          </form>
+
+          {steps.length > 0 && <ProgressList steps={steps} />}
+          {result && <RegistrationResult result={result} />}
+          {error && <ErrorMessage error={error} onRetry={reset} />}
+        </div>
+      );
+    }
+    ```
+
+    `useRegistration` is called without arguments — it reads the client from `HyperAuthProvider` internally. The `register(alias)` function is the only call you need to make. Everything else — passkey creation, identity generation, on-chain submission — happens automatically.
+  </Step>
+
+  <Step title="Add the ProgressList component">
+    Add this to the same file, below `RegistrationForm`:
+
+    ```tsx src/RegistrationForm.tsx
+    import type { RegistrationStep } from '@hyperauth/react';
+
+    function ProgressList({ steps }: { steps: RegistrationStep[] }) {
+      return (
+        <ol style={{ listStyle: 'none', padding: 0 }}>
+          {steps.map((step, i) => (
+            <li key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <StepIcon status={step.status} />
+              <span>{step.label}</span>
+              {step.detail && (
+                <span style={{ color: 'grey', fontSize: '0.85em' }}>— {step.detail}</span>
+              )}
+            </li>
+          ))}
+        </ol>
+      );
+    }
+
+    function StepIcon({ status }: { status: RegistrationStep['status'] }) {
+      const icons: Record<RegistrationStep['status'], string> = {
+        pending: '○',
+        active: '◐',
+        done: '●',
+        error: '✕',
+      };
+      return <span aria-hidden="true">{icons[status]}</span>;
+    }
+    ```
+
+    Each `RegistrationStep` has three fields:
+
+    ```ts
+    interface RegistrationStep {
+      label: string;
+      status: 'pending' | 'active' | 'done' | 'error';
+      detail?: string;
+    }
+    ```
+
+    The `detail` field carries short contextual text that HyperAuth fills in as each step finishes — for example step 0 sets `detail` to `'Available'` once the alias check passes, and step 3 sets it to the predicted smart account address.
+  </Step>
+
+  <Step title="Add the result and error components">
+    Still in `src/RegistrationForm.tsx`:
+
+    ```tsx src/RegistrationForm.tsx
+    import type { RegistrationOutcome } from '@hyperauth/react';
+
+    function RegistrationResult({ result }: { result: RegistrationOutcome }) {
+      return (
+        <div>
+          <h3>Registration complete</h3>
+          <dl>
+            <dt>DID</dt>
+            <dd style={{ wordBreak: 'break-all' }}>{result.did}</dd>
+
+            <dt>Smart account</dt>
+            <dd style={{ wordBreak: 'break-all' }}>{result.smartAccount}</dd>
+
+            <dt>Transaction</dt>
+            <dd style={{ wordBreak: 'break-all' }}>{result.txHash}</dd>
+
+            {result.blockNumber !== null && (
+              <>
+                <dt>Block</dt>
+                <dd>{result.blockNumber}</dd>
+              </>
+            )}
+          </dl>
+        </div>
+      );
+    }
+
+    function ErrorMessage({ error, onRetry }: { error: string; onRetry: () => void }) {
+      return (
+        <div role="alert">
+          <p>{error}</p>
+          <button onClick={onRetry}>Try again</button>
+        </div>
+      );
+    }
+    ```
+
+    `RegistrationOutcome` is the shape of the `result` value returned by the hook once registration completes:
+
+    ```ts
+    interface RegistrationOutcome {
+      did: string;
+      txHash: string;
+      blockNumber: number | null;
+      smartAccount: string;
+    }
+    ```
+  </Step>
+
+  <Step title="Mount the form in your app">
+    Open `src/App.tsx` and add the form inside the ready branch:
+
+    ```tsx src/App.tsx
+    import { useHyperAuth } from '@hyperauth/react';
+    import { RegistrationForm } from './RegistrationForm';
+
+    export default function App() {
+      const { status } = useHyperAuth();
+
+      if (status === 'initializing') return <p>Loading...</p>;
+      if (status === 'error') return <p>Failed to initialise HyperAuth.</p>;
+
+      return (
+        <main>
+          <h1>Create your identity</h1>
+          <RegistrationForm />
+        </main>
+      );
+    }
+    ```
+  </Step>
+
+  <Step title="Run the flow end to end">
+    Start the dev server and open the app:
+
+    ```bash
+    npm run dev
+    ```
+
+    Type an alias — for example `alice` — and click **Register**. You'll see the progress list come alive one row at a time:
+
+    ```
+    ● Checking availability  — Available
+    ● Creating passkey       — Created
+    ◐ Generating identity
+    ○ Predicting account
+    ○ Checking account state
+    ...
+    ```
+
+    Follow the browser's WebAuthn prompt when step 1 appears. After step 10 confirms on-chain, the result panel appears with your DID, smart account address, and transaction hash.
+
+    <Check>
+      If the alias is already taken, the flow stops at step 0 with an error message and the **Try again** button resets everything so the user can pick a different name.
+    </Check>
+  </Step>
+</Steps>
+
+## What you have built
+
+You've built a complete identity registration flow. `useRegistration` manages all twelve steps of the process — alias checking, passkey creation, identity generation, account prediction, fee sponsorship, signing, on-chain submission, and session storage — and exposes just enough state for your UI to reflect exactly what is happening at every moment.
+
+The `result.did` and `result.smartAccount` values you received are now live on-chain. The next tutorial, [Sign and Verify Data](/tutorials/sign-and-verify), shows how to use the identity you just created to sign arbitrary messages.
