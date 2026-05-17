@@ -1,0 +1,420 @@
+---
+title: Smart Contracts Reference
+description: All contracts are deployed on Base Sepolia (chain ID 84532). 
+---
+
+All contracts are deployed on Base Sepolia (chain ID `84532`). Solidity version: `^0.8.28`.
+
+---
+
+## Deployment addresses
+
+| Contract | Address (Base Sepolia) |
+|---|---|
+| `EntryPoint` (ERC-4337 v0.7) | `0x0000000071727De22E5E9d8BAf0edAc6f37da032` |
+| `DIDRegistry` | `0xd38972ffea26b66f09e2109e650887acd447e7b7` |
+| `AccountHelper` | `0xd4d57cc363dd419cd95712eb5cddf1797ceb9dde` |
+| `SessionSBT` | `0x5a2822bd69aa3799232ac57decf2b07e3fed1881` |
+| `HyperAuthFactory` | `0xb797f4799d8aa218e9207f918fdea3afc76b1e18` |
+
+ABIs are exported from `@hyperauth/contracts`:
+
+```ts
+import {
+  didRegistryAbi,
+  hyperAuthAccountAbi,
+  hyperAuthFactoryAbi,
+  accountHelperAbi,
+  sessionSBTAbi,
+  deployments,
+  getAddresses,
+} from '@hyperauth/contracts'
+import type { ChainId } from '@hyperauth/contracts'
+```
+
+---
+
+## DIDRegistry
+
+```
+0xd38972ffea26b66f09e2109e650887acd447e7b7 (Base Sepolia)
+```
+
+Anchors off-chain DIDs to on-chain accounts. Compatible with W3C DID Core v1.0. Inherits `Ownable`.
+
+### `DidDocument` struct
+
+```solidity
+struct DidDocument {
+    address controller;   // The HyperAuthAccount that controls this DID
+    uint256 created;      // Block timestamp of registration
+    uint256 updated;      // Block timestamp of last update
+    string  metadataCid;  // IPFS CID of the full DID Document (optional)
+    bool    active;       // false after deactivation
+}
+```
+
+### State variables
+
+| Variable | Type | Description |
+|---|---|---|
+| `dids` | `mapping(bytes32 => DidDocument)` | DID hash → document |
+| `controllerToDid` | `mapping(address => bytes32)` | Controller address → DID hash |
+| `aliases` | `mapping(bytes32 => bytes32)` | Alias hash → DID hash |
+| `didToAlias` | `mapping(bytes32 => bytes32)` | DID hash → alias hash |
+
+### Functions
+
+#### `register`
+
+```solidity
+function register(
+    bytes32 didHash,
+    bytes32 aliasHash,
+    string calldata metadataCid
+) external
+```
+
+Registers a new DID with a human-readable alias. `msg.sender` is set as the controller.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `didHash` | `bytes32` | `keccak256` of the full DID string |
+| `aliasHash` | `bytes32` | `keccak256(toHex(normalizedAlias))` |
+| `metadataCid` | `string` | IPFS CID of the DID Document |
+
+Reverts if the DID is already registered, the controller already has a DID, `aliasHash` is zero, or the alias is already claimed.
+
+Emits: `DIDRegistered`, `AliasRegistered`.
+
+---
+
+#### `update`
+
+```solidity
+function update(bytes32 didHash, string calldata newMetadataCid) external
+```
+
+Updates the metadata IPFS CID. Only callable by the DID's controller.
+
+Reverts if `msg.sender` is not the controller, or if the DID is deactivated.
+
+Emits: `DIDUpdated`.
+
+---
+
+#### `deactivate`
+
+```solidity
+function deactivate(bytes32 didHash) external
+```
+
+Deactivates a DID and cleans up alias mappings. Only callable by the controller. Sets `active = false`. Removes `controllerToDid`, `aliases`, and `didToAlias` entries.
+
+Emits: `DIDDeactivated`.
+
+---
+
+#### `resolve`
+
+```solidity
+function resolve(bytes32 didHash) external view returns (DidDocument memory)
+```
+
+Returns the `DidDocument` for the given DID hash.
+
+---
+
+#### `resolveAlias`
+
+```solidity
+function resolveAlias(bytes32 aliasHash) external view returns (DidDocument memory)
+```
+
+Resolves an alias hash to its DID document. Returns a zero-initialized `DidDocument` if the alias is not registered. Used by the frontend to check alias availability.
+
+---
+
+### Events
+
+| Event | Parameters | Description |
+|---|---|---|
+| `DIDRegistered` | `bytes32 indexed didHash`, `address indexed controller`, `string metadataCid` | New DID registered |
+| `DIDUpdated` | `bytes32 indexed didHash`, `string newMetadataCid` | Metadata CID updated |
+| `DIDDeactivated` | `bytes32 indexed didHash` | DID deactivated |
+| `AliasRegistered` | `bytes32 indexed aliasHash`, `bytes32 indexed didHash` | Alias mapping created |
+
+---
+
+## HyperAuthAccount
+
+ERC-4337 smart account. Inherits `BaseAccount` from `@account-abstraction/contracts`. Uses P-256 (secp256r1) signature verification via the `LibP256` library.
+
+### State variables
+
+| Variable | Type | Description |
+|---|---|---|
+| `ENTRY_POINT` | `address` (immutable) | The ERC-4337 EntryPoint address |
+| `publicKeyX` | `uint256` | P-256 public key X coordinate |
+| `publicKeyY` | `uint256` | P-256 public key Y coordinate |
+
+### Constructor
+
+```solidity
+constructor(address entryPoint_, uint256 x, uint256 y)
+```
+
+Sets the immutable entry point and public key coordinates.
+
+### Functions
+
+#### `getOwner`
+
+```solidity
+function getOwner() external view returns (uint256 x, uint256 y)
+```
+
+Returns the P-256 public key coordinates that own this account.
+
+| Return | Type | Description |
+|---|---|---|
+| `x` | `uint256` | X coordinate of the P-256 key |
+| `y` | `uint256` | Y coordinate of the P-256 key |
+
+---
+
+#### `_validateSignature`
+
+```solidity
+function _validateSignature(
+    PackedUserOperation calldata userOp,
+    bytes32 userOpHash
+) internal view override returns (uint256)
+```
+
+Validates an ERC-4337 UserOperation signature. Overrides `BaseAccount._validateSignature`.
+
+Expects `userOp.signature` to be exactly 64 bytes: ABI-encoded `(uint256 r, uint256 s)`. Verifies using `LibP256.verifySignature` against the stored public key.
+
+Returns `0` (success) or `SIG_VALIDATION_FAILED`.
+
+---
+
+#### `entryPoint`
+
+```solidity
+function entryPoint() public view override returns (IEntryPoint)
+```
+
+Returns `IEntryPoint(ENTRY_POINT)`. Overrides `BaseAccount.entryPoint`.
+
+---
+
+#### `receive`
+
+```solidity
+receive() external payable
+```
+
+Accepts ETH deposits.
+
+---
+
+## HyperAuthFactory
+
+Deploys `HyperAuthAccount` contracts deterministically via `CREATE2`. The predicted address depends on the P-256 public key coordinates and an optional salt.
+
+### State variables
+
+| Variable | Type | Description |
+|---|---|---|
+| `ACCOUNT_IMPLEMENTATION` | `address` (immutable) | Template account deployed in constructor |
+| `ENTRY_POINT` | `address` (immutable) | EntryPoint address passed to each account |
+
+### Constructor
+
+```solidity
+constructor(address entryPoint_)
+```
+
+Deploys a template `HyperAuthAccount(entryPoint_, 0, 0)` and stores it as `ACCOUNT_IMPLEMENTATION`.
+
+### Functions
+
+#### `createAccount`
+
+```solidity
+function createAccount(
+    uint256 pubKeyX,
+    uint256 pubKeyY,
+    uint256 salt
+) external returns (address ret)
+```
+
+Deploys a `HyperAuthAccount` via `CREATE2`. If the account already exists at the predicted address, returns the existing address without deploying.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `pubKeyX` | `uint256` | P-256 public key X coordinate |
+| `pubKeyY` | `uint256` | P-256 public key Y coordinate |
+| `salt` | `uint256` | Additional entropy for address derivation |
+
+The `CREATE2` salt is `keccak256(abi.encodePacked(pubKeyX, pubKeyY, salt))`.
+
+Reverts with `"Create2 failed"` if deployment fails.
+
+Emits: `AccountCreated`.
+
+---
+
+#### `getAddress`
+
+```solidity
+function getAddress(
+    uint256 pubKeyX,
+    uint256 pubKeyY,
+    uint256 salt
+) public view returns (address predicted)
+```
+
+Pre-computes the account address without deploying. Used by the frontend to derive the smart account address before the UserOperation is submitted.
+
+---
+
+### Events
+
+| Event | Parameters | Description |
+|---|---|---|
+| `AccountCreated` | `address indexed account`, `address indexed owner` | Emitted when a new account is deployed |
+
+---
+
+## AccountHelper
+
+```
+0xd4d57cc363dd419cd95712eb5cddf1797ceb9dde (Base Sepolia)
+```
+
+Stateless lens contract. Aggregates `HyperAuthAccount` and `DIDRegistry` state into a single `eth_call`. Deploy once, never upgrade.
+
+### State variables
+
+| Variable | Type | Description |
+|---|---|---|
+| `REGISTRY` | `DIDRegistry` (immutable) | DIDRegistry contract reference |
+
+### `AccountState` struct
+
+```solidity
+struct AccountState {
+    uint256    nonce;     // Current ERC-4337 nonce (key=0 via getNonce())
+    bytes32    did;       // DID hash from DIDRegistry (bytes32(0) if not registered)
+    bool       isActive;  // true if the account has deployed code
+    uint256[2] pubKey;    // Passkey P-256 public key [X, Y]
+}
+```
+
+### Functions
+
+#### `getAccountState`
+
+```solidity
+function getAccountState(address account) external view returns (AccountState memory state)
+```
+
+Fetches complete account state in one call. Returns early with zero-valued fields (except `isActive = false`) if the account has no deployed code.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `account` | `address` | The `HyperAuthAccount` address to query |
+
+Steps performed:
+1. Checks `account.code.length > 0` to set `isActive`.
+2. Calls `HyperAuthAccount.getNonce()` for the nonce.
+3. Calls `HyperAuthAccount.getOwner()` for the public key coordinates.
+4. Calls `DIDRegistry.controllerToDid(account)` for the DID hash.
+
+---
+
+## SessionSBT
+
+```
+0x5a2822bd69aa3799232ac57decf2b07e3fed1881 (Base Sepolia)
+```
+
+ERC-721 Soulbound Token for session management. Name: `"HyperAuth Session"`, symbol: `"HYS"`. Inherits `ERC721`, `Ownable`.
+
+### State variables
+
+| Variable | Type | Description |
+|---|---|---|
+| `isRevoked` | `mapping(uint256 => bool)` | Token ID → revocation status |
+
+### Functions
+
+#### `mintSession`
+
+```solidity
+function mintSession(address to) external onlyOwner returns (uint256)
+```
+
+Mints a new session token to the given address. Only callable by the contract owner (the authorized HyperAuth bundler or factory).
+
+| Parameter | Type | Description |
+|---|---|---|
+| `to` | `address` | Recipient smart account address |
+
+Returns the token ID of the minted token.
+
+---
+
+#### `revokeSession`
+
+```solidity
+function revokeSession(uint256 tokenId) external onlyOwner
+```
+
+Marks a session token as revoked. Only callable by the contract owner. Does not burn the token; sets `isRevoked[tokenId] = true`.
+
+---
+
+#### `isRevoked` (mapping)
+
+```solidity
+mapping(uint256 => bool) public isRevoked
+```
+
+Returns `true` for a given token ID if that session has been revoked.
+
+---
+
+### Soulbound behavior
+
+```solidity
+function _update(address to, uint256 tokenId, address auth)
+    internal override returns (address)
+```
+
+Overrides `ERC721._update`. Allows minting (`from == address(0)`) and burning (`to == address(0)`), but reverts with `"SessionSBT: Token is Soulbound"` for any transfer between non-zero addresses.
+
+---
+
+## LibP256
+
+```
+core/contracts/src/libraries/LibP256.sol
+```
+
+Library for P-256 (secp256r1) signature verification. Used internally by `HyperAuthAccount._validateSignature`. Not deployed standalone.
+
+```solidity
+function verifySignature(
+    bytes32 hash,
+    uint256 r,
+    uint256 s,
+    uint256 x,
+    uint256 y
+) internal view returns (bool)
+```
+
+Verifies a P-256 ECDSA signature. Uses Base's RIP-7212 P-256 precompile where available.

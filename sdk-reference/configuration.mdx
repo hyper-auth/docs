@@ -1,0 +1,149 @@
+---
+title: Configuration Reference
+description: Configuration objects for the HyperAuth SDK client and Vault worker.
+---
+
+Configuration objects for the HyperAuth SDK client.
+
+---
+
+## `ClientConfig`
+
+Passed to `createClient(config)` or `HyperAuthClient.create(plugin, config)`. All fields are optional.
+
+```typescript
+interface ClientConfig {
+  wasmUrl?: string;
+  wasmBytes?: Uint8Array;
+  logger?: Pick<Console, 'log' | 'error' | 'warn' | 'info' | 'debug'>;
+  debug?: boolean;
+  autoLockTimeout?: number;
+  contracts?: ContractsConfig;
+}
+```
+
+### Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `wasmUrl` | `string` | `"/enclave.wasm"` | URL from which the WASM enclave binary is fetched. Used by `createClient()` when initializing the core worker. |
+| `wasmBytes` | `Uint8Array` | — | Raw WASM bytes. Alternative to `wasmUrl` for environments where fetching is unavailable. |
+| `logger` | `Pick<Console, 'log' \| 'error' \| 'warn' \| 'info' \| 'debug'>` | `console` | Logger instance. All log calls are gated by `debug`. |
+| `debug` | `boolean` | `false` | Enable debug logging. When `false`, no messages are emitted through the logger. |
+| `autoLockTimeout` | `number` | `300000` | Milliseconds of inactivity before the vault is automatically locked. Set to `0` to disable auto-lock. The timer resets on any vault operation. |
+| `contracts` | `ContractsConfig` | Base Sepolia defaults | On-chain contract addresses. Defaults to `defaultContracts` (Base Sepolia, chain ID 84532). |
+
+### Notes
+
+- `wasmUrl` and `wasmBytes` are mutually exclusive. `wasmBytes` takes precedence in the bridge implementation if both are supplied.
+- `autoLockTimeout` triggers `HyperAuthClient.lock()` after the inactivity period. If an `onAutoLock` callback has been registered via `setAutoLockCallback()`, it receives the encrypted `database` bytes from the lock result.
+- `createClient()` uses `wasmUrl` and `contracts` to initialize the core worker bridge. `HyperAuthClient.create()` with a pre-constructed `WasmPlugin` does not use these fields.
+
+---
+
+## `ContractsConfig`
+
+Smart contract addresses for a specific EVM chain. Used by the enclave to construct and verify on-chain operations.
+
+```typescript
+interface ContractsConfig {
+  chainId: number;
+  entryPoint: string;
+  didRegistry: string;
+  accountHelper: string;
+  sessionSBT: string;
+  hyperAuthFactory: string;
+}
+```
+
+### Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `chainId` | `number` | EVM chain ID |
+| `entryPoint` | `string` | ERC-4337 EntryPoint contract address |
+| `didRegistry` | `string` | HyperAuth DID Registry contract address |
+| `accountHelper` | `string` | Account state helper contract address. Exposes `getAccountState(address)` and used by `/api/accounts/state`. |
+| `sessionSBT` | `string` | Session Soulbound Token contract address |
+| `hyperAuthFactory` | `string` | Smart account factory contract address. Exposes `getAddress(pubKeyX, pubKeyY, salt)` and used by `/api/accounts/predict`. |
+
+### Default values (`defaultContracts`)
+
+Exported as `defaultContracts` from `@hyperauth/sdk`. Matches the `DEFAULT_CONTRACTS` constant in the Vault worker.
+
+| Field | Value |
+|---|---|
+| `chainId` | `84532` |
+| `entryPoint` | `0x0000000071727De22E5E9d8BAf0edAc6f37da032` |
+| `didRegistry` | `0xd38972ffea26b66f09e2109e650887acd447e7b7` |
+| `accountHelper` | `0xd4d57cc363dd419cd95712eb5cddf1797ceb9dde` |
+| `sessionSBT` | `0x5a2822bd69aa3799232ac57decf2b07e3fed1881` |
+| `hyperAuthFactory` | `0xb797f4799d8aa218e9207f918fdea3afc76b1e18` |
+
+---
+
+## `WorkerConfig`
+
+Configuration passed to `createCoreBridge()`. Used internally by `createClient()`.
+
+```typescript
+interface WorkerConfig {
+  wasmUrl: string;
+  debug?: boolean;
+  contracts?: ContractsConfig;
+}
+```
+
+### Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `wasmUrl` | `string` | — | URL to fetch the WASM enclave binary. Required. |
+| `debug` | `boolean` | `false` | Enable debug logging in the core worker. |
+| `contracts` | `ContractsConfig` | — | Contract addresses forwarded to the enclave. |
+
+---
+
+## `VaultStoreConfig`
+
+Configuration for `VaultStore` initialization. `VaultStore` manages the wa-sqlite persistence layer for fast page-reload restore.
+
+```typescript
+interface VaultStoreConfig {
+  dbName?: string;
+}
+```
+
+### Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `dbName` | `string` | `"hyperauth-vault"` | Name of the wa-sqlite database opened in the browser's Origin Private File System. |
+
+---
+
+## `VaultSnapshotConfig`
+
+Configuration for `VaultSnapshot`, which wraps vault bytes in DAG-CBOR and stores them in a Helia blockstore.
+
+```typescript
+interface VaultSnapshotConfig {
+  gatewayUrl?: string;
+}
+```
+
+### Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `gatewayUrl` | `string` | — | IPFS gateway URL used as a read fallback when the local Helia blockstore does not contain a requested CID. Example: `"https://trustless-gateway.link"`. |
+
+---
+
+## WebAuthn Defaults
+
+Constants defined in `sdk/client/src/constants.ts`.
+
+| Constant | Value | Description |
+|---|---|---|
+| `DEFAULT_RP_ID` | `"did.run"` | Default WebAuthn Relying Party ID used by `createPasskey()` and `authenticatePasskey()`. Overridable via `CreatePasskeyOptions.rpId`. |

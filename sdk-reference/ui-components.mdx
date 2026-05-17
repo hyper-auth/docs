@@ -1,0 +1,725 @@
+---
+title: UI Components Reference
+description: All components accept `className` for style overrides.
+---
+
+Package: `@hyperauth/ui`
+
+All components accept `className` for style overrides. All components forward additional HTML props to their underlying element via spread unless noted.
+
+---
+
+## Badge
+
+```ts
+import { Badge, badgeVariants } from '@hyperauth/ui/components/badge'
+```
+
+Inline label element. Renders as `<span>` by default. Supports `asChild` to merge props onto a child element via Radix `Slot`.
+
+### Props
+
+Extends `React.ComponentProps<'span'>`.
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `variant` | `BadgeVariant` | `'default'` | Visual style |
+| `asChild` | `boolean` | `false` | Merge props onto child element |
+| `className` | `string` | — | Additional CSS classes |
+
+### `BadgeVariant`
+
+`'default' | 'secondary' | 'destructive' | 'outline' | 'ghost' | 'link'`
+
+### `badgeVariants`
+
+`cva` variant helper. Accepts `{ variant }`. Returns a class string.
+
+---
+
+## Button
+
+```ts
+import { Button, buttonVariants } from '@hyperauth/ui/components/button'
+```
+
+Interactive button element. Renders as `<button>` by default. Supports `asChild`.
+
+### Props
+
+Extends `React.ComponentProps<'button'>`.
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `variant` | `ButtonVariant` | `'default'` | Visual style |
+| `size` | `ButtonSize` | `'default'` | Size variant |
+| `asChild` | `boolean` | `false` | Merge props onto child element |
+
+### `ButtonVariant`
+
+`'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link'`
+
+### `ButtonSize`
+
+`'default' | 'xs' | 'sm' | 'lg' | 'icon' | 'icon-xs' | 'icon-sm' | 'icon-lg'`
+
+| Value | Height |
+|---|---|
+| `'default'` | `h-9` |
+| `'xs'` | `h-6` |
+| `'sm'` | `h-8` |
+| `'lg'` | `h-10` |
+| `'icon'` | `size-9` |
+| `'icon-xs'` | `size-6` |
+| `'icon-sm'` | `size-8` |
+| `'icon-lg'` | `size-10` |
+
+### `buttonVariants`
+
+`cva` variant helper. Accepts `{ variant, size }`.
+
+---
+
+## Card
+
+```ts
+import {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardAction,
+  CardDescription,
+  CardContent,
+} from '@hyperauth/ui/components/card'
+```
+
+Compound card component. All sub-components extend `React.ComponentProps<'div'>`.
+
+| Component | Element | `data-slot` |
+|---|---|---|
+| `Card` | `div` | `'card'` |
+| `CardHeader` | `div` | `'card-header'` |
+| `CardTitle` | `div` | `'card-title'` |
+| `CardDescription` | `div` | `'card-description'` |
+| `CardAction` | `div` | `'card-action'` |
+| `CardContent` | `div` | `'card-content'` |
+| `CardFooter` | `div` | `'card-footer'` |
+
+---
+
+## Command
+
+```ts
+import {
+  Command,
+  CommandDialog,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandShortcut,
+  CommandSeparator,
+} from '@hyperauth/ui/components/command'
+```
+
+Command palette components built on `cmdk`.
+
+### `Command`
+
+Extends `React.ComponentProps<typeof CommandPrimitive>` (cmdk root).
+
+### `CommandDialog`
+
+Extends `React.ComponentProps<typeof Dialog>`.
+
+| Prop | Type | Default |
+|---|---|---|
+| `title` | `string` | `'Command Palette'` |
+| `description` | `string` | `'Search for a command to run...'` |
+| `className` | `string` | — |
+| `showCloseButton` | `boolean` | `true` |
+
+### `CommandInput`
+
+Extends `React.ComponentProps<typeof CommandPrimitive.Input>`.
+
+### `CommandList`
+
+Extends `React.ComponentProps<typeof CommandPrimitive.List>`. Max height: `300px`.
+
+### `CommandEmpty`
+
+Extends `React.ComponentProps<typeof CommandPrimitive.Empty>`.
+
+### `CommandGroup`
+
+Extends `React.ComponentProps<typeof CommandPrimitive.Group>`.
+
+### `CommandItem`
+
+Extends `React.ComponentProps<typeof CommandPrimitive.Item>`.
+
+### `CommandSeparator`
+
+Extends `React.ComponentProps<typeof CommandPrimitive.Separator>`.
+
+### `CommandShortcut`
+
+Extends `React.ComponentProps<'span'>`. Right-aligned muted keyboard shortcut display.
+
+---
+
+## Dialog
+
+```ts
+import {
+  Dialog,
+  DialogTrigger,
+  DialogPortal,
+  DialogOverlay,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from '@hyperauth/ui/components/dialog'
+```
+
+Modal dialog components built on Radix UI Dialog primitive.
+
+### `Dialog`
+
+Extends `React.ComponentProps<typeof DialogPrimitive.Root>`.
+
+### `DialogTrigger`
+
+Extends `React.ComponentProps<typeof DialogPrimitive.Trigger>`.
+
+### `DialogPortal`
+
+Extends `React.ComponentProps<typeof DialogPrimitive.Portal>`.
+
+### `DialogOverlay`
+
+Extends `React.ComponentProps<typeof DialogPrimitive.Overlay>`.
+
+### `DialogClose`
+
+Extends `React.ComponentProps<typeof DialogPrimitive.Close>`.
+
+### `DialogContent`
+
+Extends `React.ComponentProps<typeof DialogPrimitive.Content>`.
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `showCloseButton` | `boolean` | `true` | Render the built-in close button |
+
+### `DialogHeader`
+
+Extends `React.ComponentProps<'div'>`.
+
+### `DialogFooter`
+
+Extends `React.ComponentProps<'div'>`.
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `showCloseButton` | `boolean` | `false` | Render a `DialogClose` button in the footer |
+
+### `DialogTitle`
+
+Extends `React.ComponentProps<typeof DialogPrimitive.Title>`.
+
+### `DialogDescription`
+
+Extends `React.ComponentProps<typeof DialogPrimitive.Description>`.
+
+---
+
+## Input
+
+```ts
+import { Input } from '@hyperauth/ui/components/input'
+```
+
+Styled text input. Extends `React.ComponentProps<'input'>`. No additional props beyond standard `<input>` attributes.
+
+---
+
+## InputGroup
+
+```ts
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupText,
+  InputGroupInput,
+  InputGroupTextarea,
+} from '@hyperauth/ui/components/input-group'
+```
+
+Composite input with inline addons.
+
+### `InputGroup`
+
+Container. Extends `React.ComponentProps<'div'>`. Sets `role="group"`.
+
+### `InputGroupAddon`
+
+Extends `React.ComponentProps<'div'>`.
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `align` | `AddonAlign` | `'inline-start'` | Position within the group |
+
+### `AddonAlign`
+
+`'inline-start' | 'inline-end' | 'block-start' | 'block-end'`
+
+### `InputGroupButton`
+
+Extends `Omit<React.ComponentProps<typeof Button>, 'size'>`.
+
+| Prop | Type | Default |
+|---|---|---|
+| `type` | `string` | `'button'` |
+| `variant` | `ButtonVariant` | `'ghost'` |
+| `size` | `InputGroupButtonSize` | `'xs'` |
+
+### `InputGroupButtonSize`
+
+`'xs' | 'sm' | 'icon-xs' | 'icon-sm'`
+
+### `InputGroupText`
+
+Extends `React.ComponentProps<'span'>`. Muted text element inside the group.
+
+### `InputGroupInput`
+
+Extends `React.ComponentProps<'input'>`. Sets `data-slot="input-group-control"`.
+
+### `InputGroupTextarea`
+
+Extends `React.ComponentProps<'textarea'>`. Sets `data-slot="input-group-control"`.
+
+---
+
+## Label
+
+```ts
+import { Label } from '@hyperauth/ui/components/label'
+```
+
+Extends `React.ComponentProps<typeof LabelPrimitive.Root>` (Radix UI Label). No additional props.
+
+---
+
+## Logo
+
+```ts
+import { Logo } from '@hyperauth/ui/components/logo'
+```
+
+HyperAuth SVG logo mark.
+
+### Props
+
+Extends `React.SVGProps<SVGSVGElement>`.
+
+| Prop | Type | Default |
+|---|---|---|
+| `className` | `string` | `'size-6'` |
+
+Sets `aria-hidden="true"`. `viewBox="0 0 164 164"`.
+
+---
+
+## PasskeyIcon
+
+```ts
+import { PasskeyIcon } from '@hyperauth/ui/components/passkey-icon'
+```
+
+Passkey SVG icon.
+
+### Props
+
+Extends `React.SVGProps<SVGSVGElement>`.
+
+| Prop | Type | Default |
+|---|---|---|
+| `className` | `string` | `'size-4'` |
+
+Sets `aria-hidden="true"`. `viewBox="0 0 24 24"`.
+
+---
+
+## Popover
+
+```ts
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverAnchor,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverDescription,
+} from '@hyperauth/ui/components/popover'
+```
+
+Floating popover built on Radix UI Popover primitive. Marked `"use client"`.
+
+### `Popover`
+
+Extends `React.ComponentProps<typeof PopoverPrimitive.Root>`.
+
+### `PopoverTrigger`
+
+Extends `React.ComponentProps<typeof PopoverPrimitive.Trigger>`.
+
+### `PopoverContent`
+
+Extends `React.ComponentProps<typeof PopoverPrimitive.Content>`.
+
+| Prop | Type | Default |
+|---|---|---|
+| `align` | `'start' \| 'center' \| 'end'` | `'center'` |
+| `sideOffset` | `number` | `4` |
+
+Renders inside a `PopoverPrimitive.Portal`.
+
+### `PopoverAnchor`
+
+Extends `React.ComponentProps<typeof PopoverPrimitive.Anchor>`.
+
+### `PopoverHeader`
+
+Extends `React.ComponentProps<'div'>`.
+
+### `PopoverTitle`
+
+Extends `React.ComponentProps<'h2'>`. Renders as `<div>`.
+
+### `PopoverDescription`
+
+Extends `React.ComponentProps<'p'>`.
+
+---
+
+## ScrollArea
+
+```ts
+import { ScrollArea, ScrollBar } from '@hyperauth/ui/components/scroll-area'
+```
+
+Custom scrollable container built on Radix UI ScrollArea primitive.
+
+### `ScrollArea`
+
+Extends `React.ComponentProps<typeof ScrollAreaPrimitive.Root>`.
+
+### `ScrollBar`
+
+Extends `React.ComponentProps<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>`.
+
+| Prop | Type | Default |
+|---|---|---|
+| `orientation` | `'vertical' \| 'horizontal'` | `'vertical'` |
+
+---
+
+## Separator
+
+```ts
+import { Separator } from '@hyperauth/ui/components/separator'
+```
+
+Visual divider. Marked `"use client"`. Built on Radix UI Separator primitive.
+
+### Props
+
+Extends `React.ComponentProps<typeof SeparatorPrimitive.Root>`.
+
+| Prop | Type | Default |
+|---|---|---|
+| `orientation` | `'horizontal' \| 'vertical'` | `'horizontal'` |
+| `decorative` | `boolean` | `true` |
+
+---
+
+## Status
+
+```ts
+import { Status, StatusIndicator, StatusLabel, statusVariants } from '@hyperauth/ui/components/status'
+```
+
+Status badge with animated indicator dot.
+
+### `Status`
+
+```ts
+interface StatusProps extends VariantProps<typeof statusVariants>, React.ComponentProps<'div'> {
+  asChild?: boolean;
+}
+```
+
+| Prop | Type | Default |
+|---|---|---|
+| `variant` | `StatusVariant` | `'default'` |
+| `asChild` | `boolean` | `false` |
+
+### `StatusVariant`
+
+`'default' | 'success' | 'error' | 'warning' | 'info'`
+
+### `StatusIndicator`
+
+Extends `React.ComponentProps<'div'>`. Animated ping dot. Sets `data-slot="status-indicator"`.
+
+### `StatusLabel`
+
+Extends `React.ComponentProps<'div'>`. Sets `data-slot="status-label"`.
+
+### `statusVariants`
+
+`cva` variant helper. Accepts `{ variant }`.
+
+---
+
+## TextMorph
+
+```ts
+import { TextMorph } from '@hyperauth/ui/components/text-morph'
+```
+
+Animated text with character-level layout transitions via Framer Motion.
+
+### Props
+
+```ts
+type TextMorphProps = {
+  children: string;
+  as?: React.ElementType;
+  className?: string;
+  style?: React.CSSProperties;
+  variants?: Variants;
+  transition?: Transition;
+}
+```
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `children` | `string` | — | Text content |
+| `as` | `React.ElementType` | `'p'` | Root element type |
+| `className` | `string` | — | CSS classes on root element |
+| `style` | `React.CSSProperties` | — | Inline styles on root element |
+| `variants` | `Variants` | See below | Framer Motion variants for each character |
+| `transition` | `Transition` | See below | Framer Motion transition config |
+
+Default `variants`: `{ initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }`.
+
+Default `transition`: `{ type: 'spring', stiffness: 280, damping: 18, mass: 0.3 }`.
+
+Sets `aria-label={children}` on the root element. Individual characters set `aria-hidden="true"`.
+
+---
+
+## Textarea
+
+```ts
+import { Textarea } from '@hyperauth/ui/components/textarea'
+```
+
+Styled textarea. Extends `React.ComponentProps<'textarea'>`. No additional props. Auto-sizes via `field-sizing-content`. Minimum height: `min-h-16`.
+
+---
+
+## Timeline
+
+```ts
+import {
+  Timeline,
+  TimelineItem,
+  TimelineDot,
+  TimelineConnector,
+  TimelineContent,
+  TimelineHeader,
+  TimelineTitle,
+  TimelineDescription,
+  TimelineTime,
+} from '@hyperauth/ui/components/timeline'
+```
+
+Compound timeline component with store-managed item registration and automatic status derivation. Marked `"use client"`.
+
+### `Timeline`
+
+```ts
+interface TimelineProps extends React.ComponentProps<'div'> {
+  asChild?: boolean;
+  dir?: 'ltr' | 'rtl';
+  orientation?: 'vertical' | 'horizontal';
+  variant?: 'default' | 'alternate';
+  activeIndex?: number;
+}
+```
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `orientation` | `'vertical' \| 'horizontal'` | `'vertical'` | Layout direction |
+| `variant` | `'default' \| 'alternate'` | `'default'` | Side-alternating layout |
+| `activeIndex` | `number` | — | Index of the active step. Items before it are `'completed'`, the item at it is `'active'`, items after are `'pending'`. |
+| `dir` | `'ltr' \| 'rtl'` | — | Text direction. Inherits from Radix `Direction` if unset. |
+| `asChild` | `boolean` | `false` | Merge props onto child element |
+
+Sets `role="list"` and `aria-orientation`.
+
+### `TimelineItem`
+
+Extends `React.ComponentProps<'div'>`. Accepts `asChild`.
+
+Sets `role="listitem"`. Sets `aria-current="step"` when `status === 'active'`. Sets `data-status` to the derived item status.
+
+### `TimelineDot`
+
+Extends `React.ComponentProps<'div'>`. Accepts `asChild`. Sets `data-status`.
+
+Visual indicator dot. Border color reflects item status: `border-primary` for `'completed'` and `'active'`, `border-border` for `'pending'`.
+
+### `TimelineConnector`
+
+Extends `React.ComponentProps<'div'>`. Accepts `asChild`.
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `forceMount` | `boolean` | `false` | Render connector on the last item (normally hidden) |
+
+Sets `aria-hidden="true"`. Not rendered on the last item unless `forceMount` is set. Connector is colored `bg-primary` when the next item's status is `'completed'` or `'active'`.
+
+### `TimelineContent`
+
+Extends `React.ComponentProps<'div'>`. Accepts `asChild`. Sets `data-status`.
+
+### `TimelineHeader`
+
+Extends `React.ComponentProps<'div'>`. Accepts `asChild`.
+
+### `TimelineTitle`
+
+Extends `React.ComponentProps<'div'>`. Accepts `asChild`.
+
+### `TimelineDescription`
+
+Extends `React.ComponentProps<'div'>`. Accepts `asChild`.
+
+### `TimelineTime`
+
+```ts
+interface TimelineTimeProps extends React.ComponentProps<'time'> {
+  asChild?: boolean;
+}
+```
+
+Renders as `<time>` by default.
+
+---
+
+## VisuallyHiddenInput
+
+```ts
+import { VisuallyHiddenInput } from '@hyperauth/ui/components/visually-hidden-input'
+```
+
+Renders a visually hidden `<input>` that mirrors the value of a visible control element. Used to bridge custom UI controls into native form submission. Marked `"use client"`.
+
+### Props
+
+```ts
+interface VisuallyHiddenInputProps<T = string | string[]>
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'checked' | 'onReset'> {
+  value?: T;
+  checked?: boolean;
+  control: HTMLElement | null;
+  bubbles?: boolean;
+}
+```
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `control` | `HTMLElement \| null` | — | The visible control element whose size is mirrored |
+| `value` | `T` | — | Value to sync. For `checkbox`/`radio`/`switch` types, use `checked` instead. |
+| `checked` | `boolean` | — | Checked state for checkbox/radio/switch types |
+| `bubbles` | `boolean` | `true` | Whether the synthetic change event bubbles |
+| `type` | `string` | `'hidden'` | Input type. Use `'checkbox'`, `'radio'`, or `'switch'` for boolean controls. |
+
+The element is absolutely positioned off-screen. When `control` is provided, its dimensions are observed via `ResizeObserver` and reflected on the hidden input.
+
+---
+
+## Hooks
+
+### `useAsRef`
+
+```ts
+import { useAsRef } from '@hyperauth/ui/hooks/use-as-ref'
+```
+
+```ts
+function useAsRef<T>(props: T): React.RefObject<T>
+```
+
+Stores a value in a ref and keeps it current via `useIsomorphicLayoutEffect`. Returns a ref whose `.current` always reflects the latest value without triggering re-renders.
+
+---
+
+### `useIsomorphicLayoutEffect`
+
+```ts
+import { useIsomorphicLayoutEffect } from '@hyperauth/ui/hooks/use-isomorphic-layout-effect'
+```
+
+```ts
+const useIsomorphicLayoutEffect: typeof React.useEffect
+```
+
+`React.useLayoutEffect` in browser environments, `React.useEffect` in server/SSR environments. Prevents the `useLayoutEffect does nothing on the server` warning.
+
+---
+
+### `useLazyRef`
+
+```ts
+import { useLazyRef } from '@hyperauth/ui/hooks/use-lazy-ref'
+```
+
+```ts
+function useLazyRef<T>(fn: () => T): React.RefObject<T>
+```
+
+Creates a ref whose initial value is computed once from `fn` on first render. Subsequent renders return the same ref without re-running `fn`.
+
+| Param | Type | Description |
+|---|---|---|
+| `fn` | `() => T` | Initializer function, called exactly once |
+
+---
+
+## Utility
+
+### `cn`
+
+```ts
+import { cn } from '@hyperauth/ui/lib/utils'
+```
+
+```ts
+function cn(...inputs: ClassValue[]): string
+```
+
+Merges Tailwind CSS class names using `clsx` and `tailwind-merge`. Resolves conflicting utility classes in favor of the last class.

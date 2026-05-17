@@ -1,0 +1,257 @@
+---
+title: React Hooks Reference
+description: Hooks and provider API for the HyperAuth React components.
+---
+
+Package: `@hyperauth/react`
+
+---
+
+## `HyperAuthProvider`
+
+```ts
+import { HyperAuthProvider } from '@hyperauth/react'
+```
+
+Context provider that initializes `HyperAuthClient` and makes it available to the component tree via `useHyperAuth`.
+
+### Props
+
+```ts
+interface HyperAuthProviderProps {
+  config?: ClientConfig;
+  children: React.ReactNode;
+}
+```
+
+| Prop | Type | Description |
+|---|---|---|
+| `config` | `ClientConfig` | Passed directly to `createClient`. All fields are optional; see [SDK Client Reference](/sdk-reference/sdk-client#clientconfig). |
+| `children` | `React.ReactNode` | Component subtree |
+
+### Behavior
+
+- Calls `createClient(config)` once on mount inside a `useEffect`.
+- Sets `status` to `'initializing'` during setup, `'ready'` on success, `'error'` on failure.
+- Calls `client.close()` on unmount.
+- Uses a `useRef` guard to prevent double-initialization in React Strict Mode.
+
+---
+
+## `useHyperAuth`
+
+```ts
+import { useHyperAuth } from '@hyperauth/react'
+```
+
+Returns the current `HyperAuthContext` value. Throws `ClientStateError` if called outside `HyperAuthProvider`.
+
+### Signature
+
+```ts
+function useHyperAuth(): HyperAuthContextValue
+```
+
+### Return type
+
+```ts
+interface HyperAuthContextValue {
+  client: HyperAuthClient | null;
+  status: HyperAuthStatus;
+  error: Error | null;
+  isReady: boolean;
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `client` | `HyperAuthClient \| null` | Initialized client instance. `null` while initializing or on error. |
+| `status` | `HyperAuthStatus` | Current initialization state |
+| `error` | `Error \| null` | Error object if `status === 'error'`, otherwise `null` |
+| `isReady` | `boolean` | `true` when `status === 'ready'` and `client !== null` |
+
+### `HyperAuthStatus`
+
+```ts
+type HyperAuthStatus = 'initializing' | 'ready' | 'error'
+```
+
+| Value | Description |
+|---|---|
+| `'initializing'` | `createClient` is running |
+| `'ready'` | Client initialized successfully |
+| `'error'` | Client initialization failed |
+
+---
+
+## `useRegistration`
+
+```ts
+import { useRegistration } from '@hyperauth/react'
+```
+
+Manages the full 12-step registration pipeline: alias availability check, passkey creation, identity generation, account prediction, fee sponsorship, UserOp signing, submission, and session persistence.
+
+### Signature
+
+```ts
+function useRegistration(): UseRegistrationReturn
+```
+
+### Return type
+
+```ts
+interface UseRegistrationReturn {
+  phase: RegistrationPhase;
+  steps: RegistrationStep[];
+  identity: IdentityState | null;
+  result: RegistrationOutcome | null;
+  error: string | null;
+  isRegistering: boolean;
+  register: (alias: string) => Promise<void>;
+  reset: () => void;
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `phase` | `RegistrationPhase` | Current phase of the registration pipeline |
+| `steps` | `RegistrationStep[]` | Array of 12 step objects with status |
+| `identity` | `IdentityState \| null` | Populated after identity generation (step 2). Available before registration completes. |
+| `result` | `RegistrationOutcome \| null` | Populated on successful completion |
+| `error` | `string \| null` | Error message if `phase === 'error'`, otherwise `null` |
+| `isRegistering` | `boolean` | `true` while `register` is running |
+| `register` | `(alias: string) => Promise<void>` | Starts the registration pipeline. No-ops if already registering. |
+| `reset` | `() => void` | Resets all state to initial values |
+
+---
+
+### `RegistrationPhase`
+
+```ts
+type RegistrationPhase =
+  | 'idle'
+  | 'checking-alias'
+  | 'creating-passkey'
+  | 'generating-identity'
+  | 'predicting-account'
+  | 'fetching-account-state'
+  | 'creating-registration'
+  | 'sponsoring'
+  | 'authorizing'
+  | 'signing'
+  | 'submitting'
+  | 'confirming'
+  | 'storing-session'
+  | 'complete'
+  | 'error'
+```
+
+| Value | Corresponding step |
+|---|---|
+| `'idle'` | No registration in progress |
+| `'checking-alias'` | Step 0: alias availability |
+| `'creating-passkey'` | Step 1: WebAuthn ceremony |
+| `'generating-identity'` | Step 2: MPC key generation |
+| `'predicting-account'` | Step 3: smart account address derivation |
+| `'fetching-account-state'` | Step 4: on-chain nonce and active status |
+| `'creating-registration'` | Step 5: UserOp construction |
+| `'sponsoring'` | Step 6: paymaster sponsorship |
+| `'authorizing'` | Step 7: authorization gate |
+| `'signing'` | Step 8: UserOp signature |
+| `'submitting'` | Step 9: bundler submission |
+| `'confirming'` | Step 10: receipt polling |
+| `'storing-session'` | Step 11: session persistence |
+| `'complete'` | Pipeline finished successfully |
+| `'error'` | Pipeline failed |
+
+---
+
+### `RegistrationStep`
+
+```ts
+interface RegistrationStep {
+  label: string;
+  status: 'pending' | 'active' | 'done' | 'error';
+  detail?: string;
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `label` | `string` | Human-readable step description |
+| `status` | `'pending' \| 'active' \| 'done' \| 'error'` | Current step state |
+| `detail` | `string` | Optional status detail (e.g. `'Available'`, `'Confirmed'`) |
+
+The 12 step labels, in order:
+
+| Index | Label |
+|---|---|
+| 0 | `'Checking availability'` |
+| 1 | `'Creating passkey'` |
+| 2 | `'Generating identity'` |
+| 3 | `'Predicting account'` |
+| 4 | `'Checking account state'` |
+| 5 | `'Preparing registration'` |
+| 6 | `'Covering fees'` |
+| 7 | `'Granting permissions'` |
+| 8 | `'Signing securely'` |
+| 9 | `'Submitting registration'` |
+| 10 | `'Waiting for confirmation'` |
+| 11 | `'Saving session'` |
+
+---
+
+### `IdentityState`
+
+Populated after step 2 (`'generating-identity'`). Available via `identity` before `result` is set.
+
+```ts
+interface IdentityState {
+  did: string;
+  enclaveId: string;
+  publicKey: string;
+  publicKeyHex?: string;
+  pubkeyX: string;
+  pubkeyY: string;
+  ethAddress: string;
+  smartAccountAddress: string;
+  credentialId: string;
+  encryptedShares?: EncryptedShares;
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `did` | `string` | Decentralized identifier string |
+| `enclaveId` | `string` | MPC enclave instance ID |
+| `publicKey` | `string` | Base64 public key |
+| `publicKeyHex` | `string` | Hex-encoded public key |
+| `pubkeyX` | `string` | P-256 public key X coordinate (hex) |
+| `pubkeyY` | `string` | P-256 public key Y coordinate (hex) |
+| `ethAddress` | `string` | Derived Ethereum address |
+| `smartAccountAddress` | `string` | Predicted ERC-4337 smart account address |
+| `credentialId` | `string` | WebAuthn credential ID |
+| `encryptedShares` | `EncryptedShares` | MPC encrypted key shares from `generate` |
+
+---
+
+### `RegistrationOutcome`
+
+Populated on successful completion (`phase === 'complete'`).
+
+```ts
+interface RegistrationOutcome {
+  did: string;
+  txHash: string;
+  blockNumber: number | null;
+  smartAccount: string;
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `did` | `string` | Registered DID string |
+| `txHash` | `string` | Transaction hash of the confirmed UserOperation |
+| `blockNumber` | `number \| null` | Block number of confirmation; `null` if not parseable |
+| `smartAccount` | `string` | Deployed smart account address |

@@ -1,0 +1,1016 @@
+---
+title: TypeScript Types Reference
+description: All types exported from @hyperauth/sdk (package @hyperauth/client).
+---
+
+All types exported from `@hyperauth/sdk` (package `@hyperauth/client`). Types sourced from `@hyperauth/schemas` (auto-generated from Go struct definitions) are noted as such. Types that intentionally diverge from the Go-generated schemas are noted separately.
+
+---
+
+## Identity
+
+### `GenerateInput`
+
+Input to the `generate` enclave operation. Passed as JSON to the WASM plugin.
+
+```typescript
+interface GenerateInput {
+  credential: string;         // Base64-encoded WebAuthn credential
+  identifier?: string;        // Verified identifier (email, phone)
+  channel?: string;           // Verification channel ("email", "sms")
+  verification_proof?: string; // Signed attestation from the registrar
+}
+```
+
+---
+
+### `GenerateOutput`
+
+Returned from the enclave `generate` operation. Sourced from `@hyperauth/schemas`.
+
+```typescript
+interface GenerateOutput {
+  did: string;           // Decentralized identifier (did:new:0x...)
+  database: number[];    // Encrypted SQLite database bytes
+  enclave_id: string;    // MPC enclave identifier
+  public_key: string;    // Compressed or uncompressed public key hex
+  pubkey_x?: string;     // P-256 X coordinate (hex, 32 bytes)
+  pubkey_y?: string;     // P-256 Y coordinate (hex, 32 bytes)
+  accounts: AccountInfo[];
+}
+```
+
+---
+
+### `GenerateOutputWithShares`
+
+Extends `GenerateOutput` with MPC share material. Used internally when the enclave returns shares alongside the database.
+
+```typescript
+interface GenerateOutputWithShares extends GenerateOutput {
+  encrypted_shares?: EncryptedShares;
+  public_key_hex?: string;
+}
+```
+
+---
+
+### `GenerateResult`
+
+Result type returned by `HyperAuthClient.generate()` and `CoreAPI.generate()`.
+
+```typescript
+interface GenerateResult {
+  success: boolean;
+  did: string;
+  address: string;
+  shares: EncryptedShares & { enclave_id: string };
+  parsed_credential: Record<string, unknown>;
+}
+```
+
+---
+
+### `AccountInfo`
+
+Minimal account descriptor returned from enclave generation. Sourced from `@hyperauth/schemas`.
+
+```typescript
+interface AccountInfo {
+  address: string;   // Blockchain address
+  chain_id: string;  // Chain ID string (e.g., "84532")
+}
+```
+
+---
+
+### `Account`
+
+Full account descriptor as returned by `query()`. Includes additional fields beyond the schema-generated `AccountInfo`. These extra fields (`coin_type`, `account_index`, `address_index`) reflect the SDK's local definition, which intentionally diverges from `@hyperauth/schemas`.
+
+```typescript
+interface Account {
+  address: string;
+  chain_id: string;
+  coin_type: number;
+  account_index: number;
+  address_index: number;
+  label: string;
+  is_default: boolean;
+}
+```
+
+---
+
+### `VerificationMethod`
+
+Public key associated with a DID document. Sourced from `@hyperauth/schemas`.
+
+```typescript
+interface VerificationMethod {
+  id: string;          // Method ID (did:new:abc#key-1)
+  type: string;        // Key type (e.g., "EcdsaSecp256r1VerificationKey2019")
+  controller: string;  // Controller DID
+  public_key: string;  // Base64-encoded public key
+  purpose: string;     // Key purpose (authentication, assertion, etc.)
+}
+```
+
+---
+
+### `Credential`
+
+WebAuthn credential record as returned by `query()`. Sourced from `@hyperauth/schemas`.
+
+```typescript
+interface Credential {
+  credential_id: string;  // WebAuthn credential ID (base64url)
+  device_name: string;
+  device_type: string;    // "platform" or "cross-platform"
+  authenticator: string;  // Device name (Touch ID, Face ID, YubiKey, etc.)
+  transports: string[];   // Available transports (internal, usb, nfc, ble)
+  created_at: string;     // ISO 8601 timestamp
+  last_used: string;      // ISO 8601 timestamp
+}
+```
+
+---
+
+### `CreateRegistrationInput`
+
+Input to `HyperAuthClient.createRegistration()`.
+
+```typescript
+interface CreateRegistrationInput {
+  sender: string;  // Smart account address (EVM, checksum not required)
+  alias: string;   // On-chain alias (handle)
+  cid?: string;    // Optional IPFS metadata CID
+  did?: string;    // Optional DID override
+}
+```
+
+---
+
+### `RegistrationResult`
+
+Returned by `HyperAuthClient.createRegistration()`. The SDK's local definition intentionally diverges from `@hyperauth/schemas` (which omits `alias_hash`).
+
+```typescript
+interface RegistrationResult {
+  user_op: UserOp | null;  // Unsigned UserOperation (null if no on-chain tx needed)
+  did_hash: string;         // Keccak256 hash of the DID
+  alias_hash: string;       // Keccak256 hash of the alias
+  metadata_cid: string;     // IPFS CID of DID metadata
+  call_data: string;        // Encoded calldata for the smart account
+  entry_point: string;      // ERC-4337 EntryPoint contract address
+  registry_addr: string;    // DID Registry contract address
+}
+```
+
+---
+
+## Vault State
+
+### `LoadInput`
+
+```typescript
+interface LoadInput {
+  database: number[];  // Encrypted SQLite database bytes
+}
+```
+
+---
+
+### `LoadOutput`
+
+Sourced from `@hyperauth/schemas`.
+
+```typescript
+interface LoadOutput {
+  success: boolean;
+  did?: string;    // DID of the loaded vault
+  error?: string;
+}
+```
+
+---
+
+### `LockOutput`
+
+Sourced from `@hyperauth/schemas`.
+
+```typescript
+interface LockOutput {
+  success: boolean;
+  database?: number[];  // Encrypted database bytes (store client-side for restore)
+  error?: string;
+}
+```
+
+---
+
+### `UnlockInput`
+
+```typescript
+interface UnlockInput {
+  database: number[];  // Encrypted database bytes from a previous lock
+}
+```
+
+---
+
+### `UnlockOutput`
+
+Sourced from `@hyperauth/schemas`.
+
+```typescript
+interface UnlockOutput {
+  success: boolean;
+  did?: string;   // DID of the unlocked vault
+  error?: string;
+}
+```
+
+---
+
+### `StatusOutput`
+
+Sourced from `@hyperauth/schemas`.
+
+```typescript
+interface StatusOutput {
+  locked: boolean;
+  initialized: boolean;
+  did?: string;             // Current vault DID (absent if not initialized)
+  last_activity?: string;   // ISO 8601 timestamp of last operation
+}
+```
+
+---
+
+### `QueryInput`
+
+```typescript
+interface QueryInput {
+  did: string;  // DID to query; empty string resolves to current vault DID
+}
+```
+
+---
+
+### `QueryOutput`
+
+The SDK's local definition of `QueryOutput`. The `accounts` field uses the SDK's extended `Account` type (adds `coin_type`, `account_index`, `address_index`), which diverges from `@hyperauth/schemas`.
+
+```typescript
+interface QueryOutput {
+  did: string;
+  controller: string;
+  verification_methods: VerificationMethod[];
+  accounts: Account[];
+  credentials: Credential[];
+}
+```
+
+---
+
+### `ExecInput`
+
+```typescript
+interface ExecInput {
+  filter: string;   // Resource-action filter (e.g., "resource:accounts action:list")
+  token?: string;   // Optional UCAN delegation token
+}
+```
+
+---
+
+### `ExecOutput<T>`
+
+Generic result type for `exec` operations. The SDK uses a generic `T` for the `result` field; `@hyperauth/schemas` generates `result?: number[]` (raw bytes). Use the SDK's generic form when calling `HyperAuthClient.execute()`.
+
+```typescript
+interface ExecOutput<T = unknown> {
+  success: boolean;
+  result?: T;
+  error?: string;
+}
+```
+
+---
+
+### `VaultExportOutput`
+
+Sourced from `@hyperauth/schemas`.
+
+```typescript
+interface VaultExportOutput {
+  success: boolean;
+  data?: number[];       // Encrypted vault bytes (MTRV format)
+  did?: string;
+  exported_at?: string;  // ISO 8601 timestamp
+  error?: string;
+}
+```
+
+---
+
+### `VaultImportOutput`
+
+Sourced from `@hyperauth/schemas`.
+
+```typescript
+interface VaultImportOutput {
+  success: boolean;
+  did?: string;
+  accounts?: number;     // Count of imported accounts
+  credentials?: number;  // Count of imported credentials
+  error?: string;
+}
+```
+
+---
+
+### `VaultExportOptions`
+
+Options for `HyperAuthClient.exportVault()`.
+
+```typescript
+interface VaultExportOptions {
+  password: string;  // Password used to encrypt the export (AES-256-GCM via Argon2id KDF)
+}
+```
+
+---
+
+### `VaultImportOptions`
+
+Options for `HyperAuthClient.importVault()`.
+
+```typescript
+interface VaultImportOptions {
+  data: Uint8Array | number[];  // Encrypted vault bytes
+  password: string;             // Password used during export
+}
+```
+
+---
+
+## ERC-4337
+
+### `UserOp`
+
+ERC-4337 PackedUserOperation. Sourced from `@hyperauth/schemas`. All numeric fields are hex strings as required by the bundler JSON-RPC API.
+
+```typescript
+interface UserOp {
+  sender: string;
+  nonce: string;
+  factory: string | null;
+  factoryData: string | null;
+  callData: string;
+  callGasLimit: string;
+  verificationGasLimit: string;
+  preVerificationGas: string;
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
+  paymaster: string | null;
+  paymasterVerificationGasLimit: string | null;
+  paymasterPostOpGasLimit: string | null;
+  paymasterData: string | null;
+  signature: string;
+}
+```
+
+---
+
+### `SignUserOpResult`
+
+Returned by `HyperAuthClient.signUserOp()`.
+
+```typescript
+interface SignUserOpResult {
+  signature: string;       // Hex-encoded ERC-4337 signature
+  user_op_hash: string;    // UserOperation hash
+  enclave_id: string;      // MPC enclave identifier used for signing
+  public_key: string;      // Public key hex used for signing
+}
+```
+
+---
+
+### `GetSmartAccountAddressInput`
+
+Input to `getSmartAccountAddress()` (wallet utility function).
+
+```typescript
+interface GetSmartAccountAddressInput {
+  pubKeyX: string;                  // P-256 X coordinate (hex)
+  pubKeyY: string;                  // P-256 Y coordinate (hex)
+  salt?: string | number | bigint;  // Counterfactual salt (default: 0)
+  vaultUrl?: string;                // Override vault base URL
+}
+```
+
+---
+
+### `GetAccountStateInput`
+
+Input to `getAccountState()` (wallet utility function).
+
+```typescript
+interface GetAccountStateInput {
+  account: string;    // Smart account address
+  vaultUrl?: string;  // Override vault base URL
+}
+```
+
+---
+
+### `AccountState`
+
+Decoded from the `accountHelper` contract's `getAccountState` ABI-encoded response.
+
+```typescript
+interface AccountState {
+  nonce: string;     // Account nonce (decimal string)
+  did: string;       // Associated DID hash (0x-prefixed hex)
+  isActive: boolean;
+  pubKeyX: string;   // P-256 X coordinate (0x-prefixed hex)
+  pubKeyY: string;   // P-256 Y coordinate (0x-prefixed hex)
+}
+```
+
+---
+
+## UCAN
+
+### `Resource`
+
+String literal union of resource identifiers used in `execute()` filter expressions.
+
+```typescript
+type Resource =
+  | 'accounts'
+  | 'credentials'
+  | 'sessions'
+  | 'grants'
+  | 'enclaves'
+  | 'delegations'
+  | 'ucans'
+  | 'verification_methods'
+  | 'services'
+  | 'service_configs'
+  | 'tokens'
+  | 'invocations'
+  | 'sync'
+  | 'oidc';
+```
+
+---
+
+### `DelegationOptions`
+
+Options for `HyperAuthClient.delegate()`.
+
+```typescript
+interface DelegationOptions {
+  to: string;                          // Audience DID
+  command: string;                     // UCAN command path (e.g., "/vault/read")
+  expiration?: number;                 // Expiration timestamp (seconds since epoch)
+  caveats?: Record<string, unknown>;   // Optional attenuation / caveats
+}
+```
+
+---
+
+### `InvocationOptions`
+
+Options for `HyperAuthClient.createInvocation()`.
+
+```typescript
+interface InvocationOptions {
+  command: string;                   // UCAN command path
+  args?: Record<string, unknown>;    // Arguments to the invocation
+  token?: string;                    // Delegation token to invoke with
+}
+```
+
+---
+
+## Sync
+
+### `SyncInitResult`
+
+Returned by `HyperAuthClient.syncInit()`. Sourced from `@hyperauth/schemas`.
+
+```typescript
+interface SyncInitResult {
+  success: boolean;
+  session_id?: string;  // Opaque session identifier
+  public_key?: string;  // Initiating device's ephemeral public key
+  expires_at?: string;  // ISO 8601 expiration timestamp
+  error?: string;
+}
+```
+
+---
+
+### `SyncRespondResult`
+
+Returned by `HyperAuthClient.syncRespond()`. Sourced from `@hyperauth/schemas`.
+
+```typescript
+interface SyncRespondResult {
+  success: boolean;
+  session_id?: string;
+  public_key?: string;         // Responding device's ephemeral public key
+  encrypted_vault?: string;    // Base64-encoded encrypted vault payload
+  status?: string;
+  error?: string;
+}
+```
+
+---
+
+### `SyncCompleteResult`
+
+Returned by `HyperAuthClient.syncComplete()`. Sourced from `@hyperauth/schemas`.
+
+```typescript
+interface SyncCompleteResult {
+  success: boolean;
+  session_id?: string;
+  did?: string;     // DID of the merged vault
+  status?: string;
+  error?: string;
+}
+```
+
+---
+
+## Payment
+
+### `PaymentParams`
+
+Input to `HyperAuthClient.submitPayment()`.
+
+```typescript
+interface PaymentParams {
+  to: string;       // Recipient address or DID
+  amount: string;   // Amount in wei (ERC-20 or ETH)
+  token: string;    // ERC-20 token address or "native" for ETH
+  chainId: number;
+  ucan?: string;    // Optional UCAN delegation token for spending constraints
+  label?: string;   // Optional label for the payment
+}
+```
+
+---
+
+### `PaymentResult`
+
+Returned by `HyperAuthClient.submitPayment()`.
+
+```typescript
+interface PaymentResult {
+  txHash: string;       // UserOperation hash (same as userOpHash)
+  userOpHash: string;   // UserOperation hash
+  chain: number;        // Chain ID
+  token: string;        // Token address or "native"
+  explorerUrl: string;  // Block explorer URL for the transaction
+}
+```
+
+Explorer URLs by chain:
+
+| Chain ID | Explorer base URL |
+|---|---|
+| `84532` | `https://sepolia.basescan.org` |
+| `8453` | `https://basescan.org` |
+| `1` | `https://etherscan.io` |
+
+---
+
+### `PaymentHandlerOptions`
+
+Options for `HyperAuthClient.registerPaymentHandler()`.
+
+```typescript
+interface PaymentHandlerOptions {
+  swUrl?: string;      // Service worker URL (default: "/pay/sw.js")
+  scope?: string;      // Service worker scope (default: "/pay/")
+  methodUrl?: string;  // Payment method identifier URL (default: "https://did.run/pay")
+}
+```
+
+---
+
+### `PaymentHandlerRegistration`
+
+Returned by `HyperAuthClient.registerPaymentHandler()`.
+
+```typescript
+interface PaymentHandlerRegistration {
+  success: boolean;
+  scope: string;
+  error?: string;  // Present when success is false
+}
+```
+
+---
+
+## Crypto / Enclave
+
+### `BinaryPayload`
+
+```typescript
+type BinaryPayload = number[] | string;
+```
+
+Used for MPC share fields and nonces, which may be serialized as either a byte array or a base64/hex string depending on the enclave version.
+
+---
+
+### `EncryptedShares`
+
+Encrypted MPC key material returned from `generate` and used as input to `sign`, `mintUcan`, and `signUserOp`.
+
+```typescript
+interface EncryptedShares {
+  public_key: BinaryPayload;
+  public_key_hex?: string;
+  val_share: BinaryPayload;    // Validator share (encrypted)
+  user_share: BinaryPayload;   // User share (encrypted)
+  nonce: BinaryPayload;        // Encryption nonce
+  curve: string;               // Elliptic curve ("P-256", "secp256k1")
+  pubkey_x?: string;           // P-256 X coordinate (hex)
+  pubkey_y?: string;           // P-256 Y coordinate (hex)
+}
+```
+
+---
+
+### `SignResult`
+
+```typescript
+interface SignResult {
+  signature: number[];  // Raw signature bytes
+}
+```
+
+---
+
+### `DeriveAddressResult`
+
+```typescript
+interface DeriveAddressResult {
+  address: string;  // Derived blockchain address
+  chain: string;    // Chain name or ID
+}
+```
+
+---
+
+### `MintUcanResult`
+
+```typescript
+interface MintUcanResult {
+  signed_dag_cbor: number[];  // DAG-CBOR encoded signed UCAN token
+}
+```
+
+---
+
+### `ParseWebAuthnResult`
+
+```typescript
+interface ParseWebAuthnResult {
+  parsed: Record<string, unknown>;  // Parsed WebAuthn credential fields
+}
+```
+
+---
+
+## Boot / Worker
+
+### `BootStatus`
+
+Returned by `HyperAuthClient.getBootStatus()`.
+
+```typescript
+interface BootStatus {
+  enclave: boolean;  // Enclave WASM loaded and initialized
+  helia: boolean;    // Helia IPFS node ready
+  libp2p: boolean;   // libp2p networking ready
+  ready: boolean;    // All subsystems ready
+}
+```
+
+---
+
+### `BootEvent`
+
+Progress event emitted during worker initialization.
+
+```typescript
+interface BootEvent {
+  type: 'boot-progress';
+  subsystem: string;                          // "enclave", "helia", or "libp2p"
+  status: 'booting' | 'ready' | 'failed';
+  error?: string;
+}
+```
+
+---
+
+## WebAuthn
+
+### `CreatePasskeyResult`
+
+Returned by `createPasskey()`.
+
+```typescript
+interface CreatePasskeyResult {
+  credential: string;    // Base64-encoded serialized WebAuthn credential
+  credentialId: string;  // WebAuthn credential ID (passkey identifier)
+}
+```
+
+---
+
+### `CreatePasskeyOptions`
+
+Options for `createPasskey()`.
+
+```typescript
+interface CreatePasskeyOptions {
+  rpName?: string;              // Relying party display name (default: "HyperAuth")
+  rpId?: string;                // Relying party ID (default: "did.run")
+  timeout?: number;             // Ceremony timeout ms (default: 60000)
+  excludeCredentials?: {
+    id: BufferSource;
+    type: 'public-key';
+    transports?: AuthenticatorTransport[];
+  }[];
+}
+```
+
+---
+
+### `DeviceCapabilities`
+
+Result of querying platform WebAuthn support.
+
+```typescript
+interface DeviceCapabilities {
+  webAuthnSupported: boolean;
+  platformAuthAvailable: boolean;
+  conditionalMediationAvailable: boolean;
+}
+```
+
+---
+
+## Vault Persistence
+
+### `VaultManifest`
+
+Single-row metadata record stored in wa-sqlite, tracking the vault's content-addressed state.
+
+```typescript
+interface VaultManifest {
+  rootCid: string | null;  // CID of latest Helia DAG-CBOR snapshot; null before first snapshot
+  did: string;
+  updatedAt: number;       // Unix timestamp (ms) of last persist
+  wasmVersion: string;     // Enclave WASM version at time of persist
+  schemaVersion: number;   // Always 1 for v0.1
+}
+```
+
+---
+
+### `VaultStoreConfig`
+
+```typescript
+interface VaultStoreConfig {
+  dbName?: string;  // wa-sqlite database name (default: "hyperauth-vault")
+}
+```
+
+---
+
+### `VaultSnapshotConfig`
+
+```typescript
+interface VaultSnapshotConfig {
+  gatewayUrl?: string;  // IPFS gateway URL for read fallback (e.g., "https://trustless-gateway.link")
+}
+```
+
+---
+
+### `PinStatus`
+
+```typescript
+type PinStatus = 'queued' | 'pinning' | 'pinned' | 'failed';
+```
+
+---
+
+### `PinRequest`
+
+```typescript
+interface PinRequest {
+  cid: string;
+  name?: string;       // Human-readable label (max 255 chars)
+  origins?: string[];  // Multiaddrs of known data providers
+  meta?: Record<string, string>;
+}
+```
+
+---
+
+### `PinInfo`
+
+```typescript
+interface PinInfo {
+  requestId: string;
+  status: PinStatus;
+  created: string;     // ISO 8601
+  pin: PinRequest;
+  delegates: string[]; // Multiaddrs of peers serving the content
+}
+```
+
+---
+
+## Indexer
+
+### `IndexerAlias`
+
+```typescript
+interface IndexerAlias {
+  found: boolean;
+  alias_hash?: string;
+  did_hash?: string;
+  active?: boolean;
+  controller?: string;
+}
+```
+
+---
+
+### `IndexerDid`
+
+```typescript
+interface IndexerDid {
+  found: boolean;
+  did_hash?: string;
+  controller?: string;
+  metadata_cid?: string;
+  active?: boolean;
+  block_number?: string;
+  tx_hash?: string;
+}
+```
+
+---
+
+### `IndexerAccount`
+
+```typescript
+interface IndexerAccount {
+  found: boolean;
+  account_address?: string;
+  owner_address?: string;
+  block_number?: string;
+  tx_hash?: string;
+}
+```
+
+---
+
+### `IndexerStats`
+
+```typescript
+interface IndexerStats {
+  total_dids: number;
+  active_dids: number;
+  total_aliases: number;
+  total_accounts: number;
+  last_block_number: number;
+}
+```
+
+---
+
+### `IndexerHealth`
+
+```typescript
+interface IndexerHealth {
+  ok: boolean;
+  chain: number;
+}
+```
+
+---
+
+### `Keccak256Fn`
+
+Function type for alias hash computation. Accepts implementations from viem, ethers, or `@noble/hashes`. When omitted, `computeAliasHash` falls back to `hash-wasm`.
+
+```typescript
+type Keccak256Fn = (value: Uint8Array | `0x${string}`) => `0x${string}`;
+```
+
+---
+
+## Error Classes
+
+All error classes extend `HyperAuthError`, which extends `Error`. The `name` property is set on each subclass for reliable `instanceof`-free discrimination.
+
+### `HyperAuthError`
+
+Base class for all SDK errors.
+
+```typescript
+class HyperAuthError extends Error {
+  readonly name: string; // "HyperAuthError"
+}
+```
+
+---
+
+### `WasmLoadError`
+
+Thrown when the WASM plugin fails to load or initialize. Message is prefixed with `"WASM load failed: "`.
+
+```typescript
+class WasmLoadError extends HyperAuthError {
+  readonly name = 'WasmLoadError';
+}
+```
+
+---
+
+### `PluginCallError`
+
+Thrown when a plugin function call returns no output or throws internally. The `functionName` property identifies which operation failed.
+
+```typescript
+class PluginCallError extends HyperAuthError {
+  readonly name = 'PluginCallError';
+  readonly functionName: string;
+}
+```
+
+Message format: `"${functionName}: ${message}"`.
+
+---
+
+### `ClientStateError`
+
+Thrown when the client is used before initialization completes or after `close()` is called.
+
+```typescript
+class ClientStateError extends HyperAuthError {
+  readonly name = 'ClientStateError';
+}
+```
+
+---
+
+### `WebAuthnError`
+
+Thrown when a WebAuthn operation fails: unsupported browser, user cancellation, or an incompatible authenticator algorithm.
+
+```typescript
+class WebAuthnError extends HyperAuthError {
+  readonly name = 'WebAuthnError';
+}
+```
+
+---
+
+### `NetworkError`
+
+Thrown when a network request to the indexer or another remote endpoint fails. Message is prefixed with `"Network: "`.
+
+```typescript
+class NetworkError extends HyperAuthError {
+  readonly name = 'NetworkError';
+}
+```
+
+---
+
+### `StorageError`
+
+Thrown when secure storage operations fail. Message is prefixed with `"Storage: "`.
+
+```typescript
+class StorageError extends HyperAuthError {
+  readonly name = 'StorageError';
+}
+```

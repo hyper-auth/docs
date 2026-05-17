@@ -1,0 +1,1235 @@
+---
+title: SDK Client Reference
+description: All exports, types, and options for the HyperAuth SDK client.
+---
+
+Package: `@hyperauth/sdk`
+
+---
+
+## Factory function
+
+### `createClient`
+
+```ts
+async function createClient(config?: ClientConfig): Promise<HyperAuthClient>
+```
+
+Initializes the vault worker, loads the WASM enclave, and returns a fully initialized `HyperAuthClient`. Throws `ClientStateError` if the vault worker fails to start.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `config` | `ClientConfig` | `{}` | Client configuration |
+
+---
+
+## `HyperAuthClient`
+
+All operations route through the vault worker. The enclave is never called directly.
+
+### Static factory
+
+```ts
+static async create(
+  plugin: WasmPlugin,
+  config?: ClientConfig,
+  core?: VaultWorkerCore,
+): Promise<HyperAuthClient>
+```
+
+Constructs a client with an explicit `WasmPlugin` adapter. Used for testing or custom plugin topologies.
+
+---
+
+## Configuration
+
+### `ClientConfig`
+
+```ts
+interface ClientConfig {
+  wasmUrl?: string;
+  wasmBytes?: Uint8Array;
+  logger?: Pick<Console, 'log' | 'error' | 'warn' | 'info' | 'debug'>;
+  debug?: boolean;
+  autoLockTimeout?: number;
+  contracts?: ContractsConfig;
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `wasmUrl` | `string` | `'/enclave.wasm'` | URL to fetch the enclave WASM |
+| `wasmBytes` | `Uint8Array` | — | Raw WASM bytes (alternative to `wasmUrl`) |
+| `logger` | `Pick<Console, ...>` | `console` | Logger instance |
+| `debug` | `boolean` | `false` | Enable debug logging |
+| `autoLockTimeout` | `number` | `300000` | Milliseconds of inactivity before auto-lock. `0` disables. |
+| `contracts` | `ContractsConfig` | Base Sepolia | On-chain contract addresses |
+
+### `ContractsConfig`
+
+```ts
+interface ContractsConfig {
+  chainId: number;
+  entryPoint: string;
+  didRegistry: string;
+  accountHelper: string;
+  sessionSBT: string;
+  hyperAuthFactory: string;
+}
+```
+
+### `defaultContracts`
+
+Pre-configured addresses for Base Sepolia (chain ID `84532`):
+
+| Contract | Address |
+|---|---|
+| `entryPoint` | `0x0000000071727De22E5E9d8BAf0edAc6f37da032` |
+| `didRegistry` | `0xd38972ffea26b66f09e2109e650887acd447e7b7` |
+| `accountHelper` | `0xd4d57cc363dd419cd95712eb5cddf1797ceb9dde` |
+| `sessionSBT` | `0x5a2822bd69aa3799232ac57decf2b07e3fed1881` |
+| `hyperAuthFactory` | `0xb797f4799d8aa218e9207f918fdea3afc76b1e18` |
+
+---
+
+## Core methods
+
+### `generate`
+
+```ts
+async generate(credential: string, options?: GenerateOptions): Promise<GenerateResult>
+```
+
+Generates a new identity (DID + MPC key shares) from a WebAuthn credential. Resets the auto-lock timer.
+
+**Parameters**
+
+| Name | Type | Description |
+|---|---|---|
+| `credential` | `string` | Base64-encoded serialized WebAuthn credential |
+| `options` | `GenerateOptions` | Optional generation parameters |
+
+**`GenerateOptions`**
+
+```ts
+interface GenerateOptions {
+  identifier?: string;
+  channel?: string;
+  verification_proof?: string;
+  encryptionKey?: string;
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `identifier` | `string` | Human-readable identifier (alias) |
+| `channel` | `string` | Channel for credential binding |
+| `verification_proof` | `string` | Verification proof |
+| `encryptionKey` | `string` | Base64-encoded 32-byte AES-256 key for encrypting the vault database |
+
+**Returns: `GenerateResult`**
+
+```ts
+interface GenerateResult {
+  success: boolean;
+  did: string;
+  address: string;
+  shares: EncryptedShares & { enclave_id: string };
+  parsed_credential: Record<string, unknown>;
+}
+```
+
+---
+
+### `ping`
+
+```ts
+async ping(message?: string): Promise<PingResult>
+```
+
+Health check and echo test against the vault worker.
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `message` | `string` | `'hello'` | Message to echo |
+
+**Returns: `PingResult`**
+
+```ts
+interface PingResult {
+  success: boolean;
+  message: string;
+  echo?: string;
+}
+```
+
+---
+
+## Cryptography methods
+
+### `sign`
+
+```ts
+async sign(encryptedShares: EncryptedShares, data: number[]): Promise<SignResult>
+```
+
+Signs raw data bytes using the MPC enclave with the given encrypted key shares.
+
+| Name | Type | Description |
+|---|---|---|
+| `encryptedShares` | `EncryptedShares` | Encrypted key shares from `generate` |
+| `data` | `number[]` | Raw bytes to sign |
+
+**Returns: `SignResult`**
+
+```ts
+interface SignResult {
+  signature: number[];
+}
+```
+
+---
+
+### `deriveAddress`
+
+```ts
+async deriveAddress(publicKeyHex: string, chain: string): Promise<DeriveAddressResult>
+```
+
+Derives a chain address from a hex-encoded public key.
+
+| Name | Type | Description |
+|---|---|---|
+| `publicKeyHex` | `string` | Hex-encoded public key |
+| `chain` | `string` | Chain identifier (e.g. `'ethereum'`) |
+
+**Returns: `DeriveAddressResult`**
+
+```ts
+interface DeriveAddressResult {
+  address: string;
+  chain: string;
+}
+```
+
+---
+
+### `mintUcan`
+
+```ts
+async mintUcan(encryptedShares: EncryptedShares, ucanPayload: Record<string, unknown>): Promise<MintUcanResult>
+```
+
+Mints a signed UCAN token using the MPC key.
+
+| Name | Type | Description |
+|---|---|---|
+| `encryptedShares` | `EncryptedShares` | Encrypted key shares |
+| `ucanPayload` | `Record<string, unknown>` | UCAN payload fields |
+
+**Returns: `MintUcanResult`**
+
+```ts
+interface MintUcanResult {
+  signed_dag_cbor: number[];
+}
+```
+
+---
+
+### `parseWebAuthn`
+
+```ts
+async parseWebAuthn(credential: Record<string, unknown>): Promise<ParseWebAuthnResult>
+```
+
+Parses a WebAuthn credential object through the enclave.
+
+**Returns: `ParseWebAuthnResult`**
+
+```ts
+interface ParseWebAuthnResult {
+  parsed: Record<string, unknown>;
+}
+```
+
+---
+
+## Vault methods
+
+### `load`
+
+```ts
+async load(source: Uint8Array | number[]): Promise<LoadOutput>
+```
+
+Loads an encrypted database into the vault worker. Resets the auto-lock timer on success.
+
+| Name | Type | Description |
+|---|---|---|
+| `source` | `Uint8Array \| number[]` | Encrypted database bytes |
+
+**Returns: `LoadOutput`** — shape mirrors `@hyperauth/schemas`.
+
+---
+
+### `lock`
+
+```ts
+async lock(): Promise<LockOutput>
+```
+
+Locks the vault: encrypts and serializes vault state. Clears the auto-lock timer.
+
+**Returns: `LockOutput`** — shape mirrors `@hyperauth/schemas`.
+
+---
+
+### `unlock`
+
+```ts
+async unlock(source: Uint8Array | number[], encryptionKey?: string): Promise<UnlockOutput>
+```
+
+Unlocks the vault from encrypted bytes. Resets the auto-lock timer on success.
+
+| Name | Type | Description |
+|---|---|---|
+| `source` | `Uint8Array \| number[]` | Encrypted database bytes |
+| `encryptionKey` | `string` | Optional base64-encoded AES-256 key |
+
+**Returns: `UnlockOutput`** — shape mirrors `@hyperauth/schemas`.
+
+---
+
+### `status`
+
+```ts
+async status(): Promise<StatusOutput>
+```
+
+Returns current vault status (locked/initialized state).
+
+**Returns: `StatusOutput`** — shape mirrors `@hyperauth/schemas`. Includes `locked: boolean`.
+
+---
+
+### `isLocked`
+
+```ts
+async isLocked(): Promise<boolean>
+```
+
+Convenience accessor. Returns `status().locked`.
+
+---
+
+### `query`
+
+```ts
+async query(did?: string): Promise<QueryOutput>
+```
+
+Queries the DID document, verification methods, accounts, and credentials for the given DID.
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `did` | `string` | `''` | DID to query; defaults to the current identity |
+
+**Returns: `QueryOutput`**
+
+```ts
+interface QueryOutput {
+  did: string;
+  controller: string;
+  verification_methods: VerificationMethod[];
+  accounts: Account[];
+  credentials: Credential[];
+}
+```
+
+**`Account`**
+
+```ts
+interface Account {
+  address: string;
+  chain_id: string;
+  coin_type: number;
+  account_index: number;
+  address_index: number;
+  label: string;
+  is_default: boolean;
+}
+```
+
+---
+
+### `exportVault`
+
+```ts
+async exportVault(options: VaultExportOptions): Promise<Uint8Array>
+```
+
+Exports the vault as a password-encrypted backup. Returns raw bytes. Throws `PluginCallError` on failure.
+
+**`VaultExportOptions`**
+
+```ts
+interface VaultExportOptions {
+  password: string;
+}
+```
+
+---
+
+### `importVault`
+
+```ts
+async importVault(options: VaultImportOptions): Promise<VaultImportOutput>
+```
+
+Imports a vault from a password-encrypted backup.
+
+**`VaultImportOptions`**
+
+```ts
+interface VaultImportOptions {
+  data: Uint8Array | number[];
+  password: string;
+}
+```
+
+**Returns: `VaultImportOutput`** — shape mirrors `@hyperauth/schemas`. Includes `success`, `did`, `accounts`, `credentials`.
+
+---
+
+## ERC-4337 methods
+
+### `createRegistration`
+
+```ts
+async createRegistration(input: CreateRegistrationInput): Promise<RegistrationResult>
+```
+
+Constructs a signed ERC-4337 UserOperation for DID registration. Throws `PluginCallError` on failure.
+
+**`CreateRegistrationInput`**
+
+```ts
+interface CreateRegistrationInput {
+  sender: string;
+  alias: string;
+  cid?: string;
+  did?: string;
+}
+```
+
+**Returns: `RegistrationResult`**
+
+```ts
+interface RegistrationResult {
+  user_op: UserOp | null;
+  did_hash: string;
+  alias_hash: string;
+  metadata_cid: string;
+  call_data: string;
+  entry_point: string;
+  registry_addr: string;
+}
+```
+
+---
+
+### `signUserOp`
+
+```ts
+async signUserOp(userOp: UserOp, token?: string): Promise<SignUserOpResult>
+```
+
+Signs an ERC-4337 UserOperation using the MPC enclave. Throws `PluginCallError` on failure.
+
+| Name | Type | Description |
+|---|---|---|
+| `userOp` | `UserOp` | ERC-4337 v0.7 UserOperation |
+| `token` | `string` | Optional UCAN delegation token |
+
+**Returns: `SignUserOpResult`**
+
+```ts
+interface SignUserOpResult {
+  signature: string;
+  user_op_hash: string;
+  enclave_id: string;
+  public_key: string;
+}
+```
+
+---
+
+### `execute`
+
+```ts
+async execute<T = unknown>(
+  resource: Resource,
+  action: string,
+  options?: { subject?: string; token?: string },
+): Promise<ExecOutput<T>>
+```
+
+Executes a resource-action command through the vault worker.
+
+| Name | Type | Description |
+|---|---|---|
+| `resource` | `Resource` | Target resource |
+| `action` | `string` | Action name |
+| `options.subject` | `string` | JSON-encoded subject parameters |
+| `options.token` | `string` | Optional UCAN delegation token |
+
+**`Resource`**
+
+```ts
+type Resource =
+  | 'accounts'
+  | 'credentials'
+  | 'sessions'
+  | 'grants'
+  | 'enclaves'
+  | 'delegations'
+  | 'ucans'
+  | 'verification_methods'
+  | 'services'
+  | 'service_configs'
+  | 'tokens'
+  | 'invocations'
+  | 'sync'
+  | 'oidc'
+```
+
+**Returns: `ExecOutput<T>`**
+
+```ts
+interface ExecOutput<T = unknown> {
+  success: boolean;
+  result?: T;
+  error?: string;
+}
+```
+
+---
+
+### `submitPayment`
+
+```ts
+async submitPayment(params: PaymentParams): Promise<PaymentResult>
+```
+
+Builds, signs, and submits an ERC-4337 payment UserOperation. Throws `PluginCallError` on failure.
+
+**`PaymentParams`**
+
+```ts
+interface PaymentParams {
+  to: string;
+  amount: string;
+  token: string;
+  chainId: number;
+  ucan?: string;
+  label?: string;
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `to` | `string` | Recipient address or DID |
+| `amount` | `string` | Amount in wei |
+| `token` | `string` | ERC-20 token address or `'native'` for ETH |
+| `chainId` | `number` | Target chain ID |
+| `ucan` | `string` | Optional UCAN delegation token for spending constraints |
+| `label` | `string` | Optional label |
+
+**Returns: `PaymentResult`**
+
+```ts
+interface PaymentResult {
+  txHash: string;
+  userOpHash: string;
+  chain: number;
+  token: string;
+  explorerUrl: string;
+}
+```
+
+---
+
+### `registerPaymentHandler`
+
+```ts
+async registerPaymentHandler(options?: PaymentHandlerOptions): Promise<PaymentHandlerRegistration>
+```
+
+Registers a Payment Handler API service worker for browser-native payment flows.
+
+**`PaymentHandlerOptions`**
+
+```ts
+interface PaymentHandlerOptions {
+  swUrl?: string;
+  scope?: string;
+  methodUrl?: string;
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `swUrl` | `string` | `'/pay/sw.js'` | Service worker URL |
+| `scope` | `string` | `'/pay/'` | Service worker scope |
+| `methodUrl` | `string` | `'https://did.run/pay'` | Payment method identifier URL |
+
+**Returns: `PaymentHandlerRegistration`**
+
+```ts
+interface PaymentHandlerRegistration {
+  success: boolean;
+  scope: string;
+  error?: string;
+}
+```
+
+---
+
+## Indexer methods
+
+These are module-level functions, not methods on `HyperAuthClient`.
+
+### `computeAliasHash`
+
+```ts
+async function computeAliasHash(alias: string, keccak256?: Keccak256Fn): Promise<`0x${string}`>
+```
+
+Computes the on-chain alias hash: `keccak256(hexEncode(utf8Bytes(alias)))`. Matches the Go enclave convention.
+
+| Name | Type | Description |
+|---|---|---|
+| `alias` | `string` | Normalized alias string |
+| `keccak256` | `Keccak256Fn` | Optional keccak256 implementation; defaults to hash-wasm |
+
+```ts
+type Keccak256Fn = (value: Uint8Array | `0x${string}`) => `0x${string}`
+```
+
+---
+
+### `lookupAlias`
+
+```ts
+async function lookupAlias(aliasHash: string, indexerUrl?: string): Promise<IndexerAlias>
+```
+
+Queries the indexer for a registered alias by its hash.
+
+**Returns: `IndexerAlias`**
+
+```ts
+interface IndexerAlias {
+  found: boolean;
+  alias_hash?: string;
+  did_hash?: string;
+  active?: boolean;
+  controller?: string;
+}
+```
+
+---
+
+### `lookupDid`
+
+```ts
+async function lookupDid(didHash: string, indexerUrl?: string): Promise<IndexerDid>
+```
+
+**Returns: `IndexerDid`**
+
+```ts
+interface IndexerDid {
+  found: boolean;
+  did_hash?: string;
+  controller?: string;
+  metadata_cid?: string;
+  active?: boolean;
+  block_number?: string;
+  tx_hash?: string;
+}
+```
+
+---
+
+### `lookupAccount`
+
+```ts
+async function lookupAccount(address: string, indexerUrl?: string): Promise<IndexerAccount>
+```
+
+**Returns: `IndexerAccount`**
+
+```ts
+interface IndexerAccount {
+  found: boolean;
+  account_address?: string;
+  owner_address?: string;
+  block_number?: string;
+  tx_hash?: string;
+}
+```
+
+---
+
+### `fetchStats`
+
+```ts
+async function fetchStats(indexerUrl?: string): Promise<IndexerStats>
+```
+
+**Returns: `IndexerStats`**
+
+```ts
+interface IndexerStats {
+  total_dids: number;
+  active_dids: number;
+  total_aliases: number;
+  total_accounts: number;
+  last_block_number: number;
+}
+```
+
+---
+
+### `fetchHealth`
+
+```ts
+async function fetchHealth(indexerUrl?: string): Promise<IndexerHealth>
+```
+
+**Returns: `IndexerHealth`**
+
+```ts
+interface IndexerHealth {
+  ok: boolean;
+  chain: number;
+}
+```
+
+Default `indexerUrl` for all indexer functions: `'/api/indexer'`.
+
+---
+
+## Passkey helpers
+
+### `createPasskey`
+
+```ts
+async function createPasskey(
+  handle: string,
+  capabilities?: DeviceCapabilities,
+  options?: CreatePasskeyOptions,
+): Promise<CreatePasskeyResult>
+```
+
+Creates a WebAuthn passkey using the ES256 (P-256) algorithm. Only ES256 is accepted; the function throws `WebAuthnError` if the authenticator returns a different algorithm.
+
+**`CreatePasskeyOptions`**
+
+```ts
+interface CreatePasskeyOptions {
+  rpName?: string;
+  rpId?: string;
+  timeout?: number;
+  excludeCredentials?: { id: BufferSource; type: 'public-key'; transports?: AuthenticatorTransport[] }[];
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `rpName` | `string` | `'HyperAuth'` | Relying party name |
+| `rpId` | `string` | `'did.run'` | Relying party ID |
+| `timeout` | `number` | `60000` | Ceremony timeout in ms |
+| `excludeCredentials` | `array` | — | Credentials to exclude |
+
+**Returns: `CreatePasskeyResult`**
+
+```ts
+interface CreatePasskeyResult {
+  credential: string;
+  credentialId: string;
+}
+```
+
+---
+
+### `authenticatePasskey`
+
+```ts
+async function authenticatePasskey(rpId?: string): Promise<string>
+```
+
+Triggers a WebAuthn assertion ceremony. Returns the credential ID string. Throws `WebAuthnError` if unsupported or cancelled.
+
+| Name | Type | Default |
+|---|---|---|
+| `rpId` | `string` | `'did.run'` |
+
+---
+
+### `DeviceCapabilities`
+
+```ts
+interface DeviceCapabilities {
+  webAuthnSupported: boolean;
+  platformAuthAvailable: boolean;
+  conditionalMediationAvailable: boolean;
+}
+```
+
+---
+
+## Device sync methods
+
+### `syncInit`
+
+```ts
+async syncInit(label?: string, expiresIn?: number): Promise<SyncInitResult>
+```
+
+Initiates a device-to-device vault sync session. Returns a session ID and public key for the initiating device. Throws `PluginCallError` on failure.
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `label` | `string` | `''` | Label for the sync session |
+| `expiresIn` | `number` | `0` | Expiration in seconds |
+
+**Returns: `SyncInitResult`** — shape mirrors `@hyperauth/schemas`. Includes `success`, `session_id`, `public_key`, `error?`.
+
+---
+
+### `syncRespond`
+
+```ts
+async syncRespond(sessionId: string, remotePublicKey: string): Promise<SyncRespondResult>
+```
+
+Responds to a sync request from a remote device. Throws `PluginCallError` on failure.
+
+**Returns: `SyncRespondResult`** — shape mirrors `@hyperauth/schemas`.
+
+---
+
+### `syncComplete`
+
+```ts
+async syncComplete(sessionId: string, remotePublicKey?: string): Promise<SyncCompleteResult>
+```
+
+Completes the sync handshake and merges vault state. Throws `PluginCallError` on failure.
+
+**Returns: `SyncCompleteResult`** — shape mirrors `@hyperauth/schemas`.
+
+---
+
+## UCAN delegation methods
+
+### `delegate`
+
+```ts
+async delegate(options: DelegationOptions): Promise<ExecOutput<void>>
+```
+
+Creates a UCAN delegation to another DID. Throws `PluginCallError` on failure.
+
+**`DelegationOptions`**
+
+```ts
+interface DelegationOptions {
+  to: string;
+  command: string;
+  expiration?: number;
+  caveats?: Record<string, unknown>;
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `to` | `string` | DID of the delegate (audience) |
+| `command` | `string` | UCAN command path, e.g. `'/vault/read'` |
+| `expiration` | `number` | Expiration timestamp (seconds since epoch) |
+| `caveats` | `Record<string, unknown>` | Optional attenuation caveats |
+
+---
+
+### `createInvocation`
+
+```ts
+async createInvocation(options: InvocationOptions): Promise<ExecOutput<void>>
+```
+
+Creates a UCAN invocation. Throws `PluginCallError` on failure.
+
+**`InvocationOptions`**
+
+```ts
+interface InvocationOptions {
+  command: string;
+  args?: Record<string, unknown>;
+  token?: string;
+}
+```
+
+---
+
+## Persistence methods
+
+These methods require the `VaultWorkerCore` bridge (available when using `createClient`).
+
+### `getBootStatus`
+
+```ts
+async getBootStatus(): Promise<BootStatus>
+```
+
+Returns boot status of the enclave and supporting services. Returns all-false if no core bridge is available.
+
+```ts
+interface BootStatus {
+  enclave: boolean;
+  helia: boolean;
+  libp2p: boolean;
+  ready: boolean;
+}
+```
+
+---
+
+### `hasPersistedVault`
+
+```ts
+async hasPersistedVault(): Promise<boolean>
+```
+
+Returns `true` if a persisted vault state is available for restore.
+
+---
+
+### `snapshotVault`
+
+```ts
+async snapshotVault(): Promise<{ cid: string } | { error: string }>
+```
+
+Takes a content-addressed snapshot of current vault state via Helia (IPFS). Returns `{ error }` if no core bridge is available.
+
+---
+
+### `persistNow`
+
+```ts
+async persistNow(): Promise<{ success: boolean; error?: string }>
+```
+
+Triggers an immediate persistence flush. Returns `{ success: false, error }` if no core bridge is available.
+
+---
+
+### `hasCorebridge`
+
+```ts
+get hasCorebridge(): boolean
+```
+
+`true` when the client was created with `createClient` and has access to the vault worker core bridge.
+
+---
+
+## Auto-lock methods
+
+### `setAutoLockCallback`
+
+```ts
+setAutoLockCallback(callback: (database: number[]) => void): void
+```
+
+Registers a callback invoked with the encrypted database bytes when the auto-lock timer fires.
+
+---
+
+### `setAutoLockTimeout`
+
+```ts
+setAutoLockTimeout(ms: number): void
+```
+
+Updates the auto-lock inactivity timeout in milliseconds. Resets the current timer. `0` disables auto-lock.
+
+---
+
+## Lifecycle methods
+
+### `reset`
+
+```ts
+async reset(): Promise<void>
+```
+
+Resets the plugin state and clears the activity timer.
+
+---
+
+### `close`
+
+```ts
+async close(): Promise<void>
+```
+
+Closes the plugin and clears the activity timer.
+
+---
+
+## Wallet pipeline functions
+
+Module-level functions for ERC-4337 UserOperation handling.
+
+### `sendUserOp`
+
+```ts
+async function sendUserOp(
+  userOp: UserOp,
+  entryPoint?: string,
+  bundlerUrl?: string,
+): Promise<string>
+```
+
+Submits a UserOperation to the bundler via `eth_sendUserOperation`. Returns the `userOpHash`.
+
+Default `bundlerUrl`: `'/api/bundler'`.
+
+---
+
+### `getUserOpReceipt`
+
+```ts
+async function getUserOpReceipt(
+  userOpHash: string,
+  bundlerUrl?: string,
+): Promise<UserOpReceipt | null>
+```
+
+Fetches a UserOperation receipt. Returns `null` if not yet confirmed.
+
+**`UserOpReceipt`**
+
+```ts
+interface UserOpReceipt {
+  userOpHash: string;
+  sender: string;
+  nonce: string;
+  success: boolean;
+  actualGasCost: string;
+  actualGasUsed: string;
+  receipt: {
+    transactionHash: string;
+    blockNumber: string;
+    status: string;
+  };
+}
+```
+
+---
+
+### `waitForReceipt`
+
+```ts
+async function waitForReceipt(
+  userOpHash: string,
+  options?: { timeout?: number; interval?: number; bundlerUrl?: string },
+): Promise<UserOpReceipt>
+```
+
+Polls for a UserOperation receipt until confirmed or timeout. Throws `NetworkError` on timeout.
+
+| Option | Type | Default |
+|---|---|---|
+| `timeout` | `number` | `120000` |
+| `interval` | `number` | `3000` |
+| `bundlerUrl` | `string` | `'/api/bundler'` |
+
+---
+
+### `getSupportedEntryPoints`
+
+```ts
+async function getSupportedEntryPoints(bundlerUrl?: string): Promise<string[]>
+```
+
+Returns supported entry point addresses from the bundler.
+
+---
+
+### `estimateUserOpGas`
+
+```ts
+async function estimateUserOpGas(
+  userOp: UserOp,
+  entryPoint?: string,
+  bundlerUrl?: string,
+): Promise<GasEstimate>
+```
+
+Estimates gas for a UserOperation via `eth_estimateUserOperationGas`.
+
+---
+
+### `sponsorUserOp`
+
+```ts
+async function sponsorUserOp(
+  userOp: UserOp,
+  entryPoint?: string,
+  bundlerUrl?: string,
+): Promise<UserOp>
+```
+
+Sponsors a UserOperation via `pm_sponsorUserOperation`. Returns the UserOperation with paymaster fields populated.
+
+---
+
+### `getSmartAccountAddress`
+
+```ts
+async function getSmartAccountAddress(input: GetSmartAccountAddressInput): Promise<string>
+```
+
+Predicts the smart account address from public key coordinates via the vault API.
+
+```ts
+interface GetSmartAccountAddressInput {
+  pubKeyX: string;
+  pubKeyY: string;
+  salt?: string | number | bigint;
+  vaultUrl?: string;
+}
+```
+
+Default `vaultUrl`: `'/api'`.
+
+---
+
+### `getAccountState`
+
+```ts
+async function getAccountState(input: GetAccountStateInput): Promise<AccountState>
+```
+
+Fetches on-chain account state from the vault API.
+
+```ts
+interface GetAccountStateInput {
+  account: string;
+  vaultUrl?: string;
+}
+```
+
+**Returns: `AccountState`**
+
+```ts
+interface AccountState {
+  nonce: string;
+  did: string;
+  isActive: boolean;
+  pubKeyX: string;
+  pubKeyY: string;
+}
+```
+
+---
+
+### `computeUserOpHash`
+
+```ts
+async function computeUserOpHash(
+  userOp: UserOp,
+  entryPoint: string,
+  chainId: number,
+): Promise<`0x${string}`>
+```
+
+Computes the ERC-4337 v0.7 UserOperation hash client-side. Matches on-chain hash derivation.
+
+---
+
+## Hex utilities
+
+```ts
+function binaryToBytes(value: BinaryPayload): Uint8Array
+function normalizeHex(hex: string): `0x${string}`
+function hexToBytes(hex: string): Uint8Array
+function bytesToHex(bytes: Uint8Array): `0x${string}`
+```
+
+```ts
+type BinaryPayload = number[] | string
+```
+
+---
+
+## Error classes
+
+All errors extend `HyperAuthError extends Error`.
+
+| Class | `name` | Description |
+|---|---|---|
+| `HyperAuthError` | `'HyperAuthError'` | Base class |
+| `WasmLoadError` | `'WasmLoadError'` | WASM plugin failed to load or initialize |
+| `PluginCallError` | `'PluginCallError'` | A vault worker function call failed. Has `functionName: string`. |
+| `ClientStateError` | `'ClientStateError'` | Client used before initialization or after close |
+| `WebAuthnError` | `'WebAuthnError'` | WebAuthn unsupported, cancelled, or wrong algorithm |
+| `NetworkError` | `'NetworkError'` | HTTP or RPC network failure |
+| `StorageError` | `'StorageError'` | Secure storage operation failure |
+
+---
+
+## Shared types
+
+### `EncryptedShares`
+
+```ts
+interface EncryptedShares {
+  public_key: BinaryPayload;
+  public_key_hex?: string;
+  val_share: BinaryPayload;
+  user_share: BinaryPayload;
+  nonce: BinaryPayload;
+  curve: string;
+  pubkey_x?: string;
+  pubkey_y?: string;
+}
+```
+
+### `UserOp`
+
+ERC-4337 v0.7 packed UserOperation. Shape mirrors `@hyperauth/schemas`.
+
+| Field | Type |
+|---|---|
+| `sender` | `string` |
+| `nonce` | `string` |
+| `factory` | `` `0x${string}` \| null `` |
+| `factoryData` | `string \| null` |
+| `callData` | `string` |
+| `callGasLimit` | `string` |
+| `verificationGasLimit` | `string` |
+| `preVerificationGas` | `string` |
+| `maxFeePerGas` | `string` |
+| `maxPriorityFeePerGas` | `string` |
+| `paymaster` | `string \| null` |
+| `paymasterVerificationGasLimit` | `string \| null` |
+| `paymasterPostOpGasLimit` | `string \| null` |
+| `paymasterData` | `string \| null` |
+| `signature` | `string` |
