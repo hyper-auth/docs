@@ -1,0 +1,99 @@
+---
+title: "UCAN Delegation"
+description: "Mint UCAN tokens, delegate capabilities to other identities, and invoke delegated commands."
+icon: "key"
+---
+
+This guide shows you how to delegate capabilities to another identity using UCAN (User-Controlled Authorization Networks) and how to invoke commands with a delegation token.
+
+## How capability-based auth works here
+
+In HyperAuth, capabilities are granted by issuing a UCAN token that specifies what a delegate is allowed to do. The issuer's DID signs the token. The delegate presents the token when invoking a command — no central authority checks permissions at runtime.
+
+<Note>
+  The vault must be unlocked for all operations below, as they require access to the identity's signing key.
+</Note>
+
+## Mint a UCAN token
+
+`mintUcan` produces a signed UCAN from the identity's key material. You supply the raw UCAN payload as a plain object. The vault signs it internally.
+
+```ts
+const result = await client.mintUcan(encryptedShares, {
+  iss: myDid,
+  aud: delegateDid,
+  exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour
+  att: [
+    {
+      with: `hyperauth:${myDid}`,
+      can: '/vault/read',
+    },
+  ],
+  prf: [],
+});
+
+const token = result.token; // signed JWT-style UCAN string
+```
+
+`encryptedShares` comes from the identity's `QueryOutput` — specifically the `encrypted_shares` field on the identity record returned from `client.query()`.
+
+## Delegate a capability
+
+`delegate` is a higher-level method that creates and stores a delegation in the vault.
+
+```ts
+await client.delegate({
+  to: 'did:key:z6Mk...',    // the delegate's DID
+  command: '/vault/read',   // UCAN command path
+  expiration: Math.floor(Date.now() / 1000) + 86400, // optional, seconds
+  caveats: { resource: 'profile' },                  // optional attenuation
+});
+```
+
+If the delegation fails (for example, the delegate DID is not found or the vault is locked), `delegate` throws a `PluginCallError`.
+
+If you need to delegate without an expiration:
+
+```ts
+await client.delegate({
+  to: delegateDid,
+  command: '/payments/send',
+});
+```
+
+## Invoke a command with a delegation token
+
+`createInvocation` executes a UCAN command by presenting a delegation token. Use this when acting on behalf of another identity that has delegated a capability to you.
+
+```ts
+await client.createInvocation({
+  command: '/vault/read',
+  args: { key: 'profile' },
+  token: delegationToken,  // the UCAN token string from the delegator
+});
+```
+
+If you hold a UCAN delegation chain (multiple hops), pass the innermost token. The vault resolves the proof chain internally.
+
+If the invocation fails because the token is expired or the command does not match the delegation, `createInvocation` throws a `PluginCallError` with the error from the vault.
+
+## Delegation without expiration or caveats
+
+Both fields are optional. A minimal delegation:
+
+```ts
+await client.delegate({
+  to: delegateDid,
+  command: '/profile/update',
+});
+```
+
+A minimal invocation:
+
+```ts
+await client.createInvocation({
+  command: '/profile/update',
+  args: { displayName: 'Alice' },
+  token: myToken,
+});
+```

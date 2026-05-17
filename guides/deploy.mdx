@@ -1,0 +1,167 @@
+---
+title: "Deploy"
+description: "Deploy the HyperAuth Vault Worker and a client app that uses the SDK to Cloudflare."
+icon: "cloud-arrow-up"
+---
+
+This guide shows you how to deploy the HyperAuth Vault Worker to Cloudflare and configure a client app that uses `@hyperauth/sdk`.
+
+## Prerequisites
+
+- A Cloudflare account with Workers, Durable Objects, D1, R2, and Analytics Engine enabled
+- `wrangler` CLI installed (`npm install -g wrangler`) and authenticated (`wrangler login`)
+- Node.js 18+
+
+## Cloudflare resource setup
+
+The Vault Worker requires the following Cloudflare resources. Create them before deploying.
+
+**D1 database** (session and DID registry):
+
+```sh
+wrangler d1 create did-sessions
+```
+
+Copy the returned `database_id` into `wrangler.toml` under `[[d1_databases]]`.
+
+**R2 bucket** (WASM and CDN assets):
+
+```sh
+wrangler r2 bucket create cdn-assets
+```
+
+**Durable Objects** are declared in `wrangler.toml` and created automatically on first deploy. The SQLite-backed `Vault` class requires the `new_sqlite_classes` migration already present in the config.
+
+## Environment secrets
+
+Set the required secrets with `wrangler secret put`. None of these should appear in source control.
+
+```sh
+# Bundler (ERC-4337)
+wrangler secret put PIMLICO_API_KEY
+
+# Twilio — SMS verification
+wrangler secret put TWILIO_ACCOUNT_SID
+wrangler secret put TWILIO_AUTH_TOKEN
+wrangler secret put TWILIO_VERIFY_SERVICE_SID
+
+# Resend — email verification
+wrangler secret put RESEND_API_KEY
+wrangler secret put RESEND_FROM_EMAIL
+
+# Attestation signing (device registration)
+wrangler secret put ATTESTATION_SIGNING_KEY
+
+# Inngest (optional — async job processing)
+wrangler secret put INNGEST_EVENT_KEY
+wrangler secret put INNGEST_SIGNING_KEY
+```
+
+For local development, put these values in `apps/vault/.dev.vars` (gitignored):
+
+```sh apps/vault/.dev.vars
+PIMLICO_API_KEY=your_key
+TWILIO_ACCOUNT_SID=your_sid
+```
+
+## Build the portal (SPA assets)
+
+The Vault Worker serves the portal SPA from `apps/portal/dist`. Build it before deploying:
+
+```sh
+cd apps/portal
+npm run build
+```
+
+The `wrangler.toml` points `[assets]` at `../portal/dist`. The worker serves the SPA for all non-API routes.
+
+## Deploy the Vault Worker
+
+From the `apps/vault` directory:
+
+```sh
+wrangler deploy
+```
+
+For a custom domain, the `wrangler.toml` already declares a route:
+
+```toml
+[[routes]]
+pattern = "did.run"
+custom_domain = true
+```
+
+Replace `did.run` with your own domain. Ensure the domain is added to your Cloudflare zone before deploying.
+
+## Upload the enclave WASM
+
+The enclave WASM is served from R2. Upload it after each enclave build:
+
+```sh
+wrangler r2 object put cdn-assets/enclave/latest/enclave.wasm \
+  --file path/to/enclave.wasm \
+  --content-type application/wasm
+```
+
+The worker falls back to `ASSETS` (the SPA bundle) if the R2 object is not present, so a missing WASM produces a 404 for `/enclave.wasm` rather than a worker crash.
+
+## Configure the SDK in your client app
+
+Point the SDK at your deployed vault URL:
+
+```ts
+import { createClient } from '@hyperauth/sdk';
+
+const client = await createClient({
+  wasmUrl: 'https://your-vault.example.com/enclave.wasm',
+  contracts: {
+    // Use defaultContracts for Base Sepolia testnet,
+    // or supply mainnet addresses from getAddresses(8453)
+  },
+});
+```
+
+If you self-host, pass your vault base URL to indexer and wallet functions:
+
+```ts
+import { getSmartAccountAddress, lookupAlias, computeAliasHash } from '@hyperauth/sdk';
+
+const address = await getSmartAccountAddress({
+  pubKeyX,
+  pubKeyY,
+  vaultUrl: 'https://your-vault.example.com/api',
+});
+
+const hash = await computeAliasHash('alice');
+const alias = await lookupAlias(hash, 'https://your-vault.example.com/api/indexer');
+```
+
+## D1 migrations
+
+Apply schema migrations on first deploy and after schema changes:
+
+```sh
+wrangler d1 migrations apply did-sessions
+```
+
+Migration files live in `apps/vault/migrations/`.
+
+## Indexer service binding
+
+The vault proxies indexer queries to the `hyperauth-indexer` worker via a service binding. If you do not run a separate indexer worker, set `INDEXER_URL` instead:
+
+```sh
+wrangler secret put INDEXER_URL
+# value: https://your-indexer.workers.dev
+```
+
+Remove the `[[services]]` binding from `wrangler.toml` if you use `INDEXER_URL` exclusively.
+
+## Local development
+
+```sh
+cd apps/vault
+wrangler dev
+```
+
+The dev server starts on `http://localhost:8787`. The SDK defaults (`/api/bundler`, `/api/indexer`, `/enclave.wasm`) resolve against the same origin, so a React app proxied to port 8787 works without any additional configuration.

@@ -1,0 +1,148 @@
+---
+title: "Vault Management"
+description: "Lock, unlock, and check vault status; export and import encrypted vault backups; persist vault state with snapshots."
+icon: "vault"
+---
+
+This guide shows you how to manage the lifecycle of a HyperAuth vault — locking and unlocking, checking status, backing up and restoring, and persisting state to durable storage.
+
+## Check vault status
+
+`status` returns the current state of the vault without modifying it:
+
+```ts
+const s = await client.status();
+
+console.log(s.locked); // boolean — whether the vault is currently locked
+console.log(s.did);    // string — the identity's DID if unlocked
+```
+
+If you only need to check the lock state:
+
+```ts
+const locked = await client.isLocked();
+```
+
+## Lock the vault
+
+Call `lock` to clear the decrypted key material from memory. The returned object includes the encrypted database bytes so you can persist them before discarding:
+
+```ts
+const result = await client.lock();
+
+if (result.success && result.database) {
+  localStorage.setItem('vault-db', JSON.stringify(Array.from(result.database)));
+}
+```
+
+## Unlock the vault
+
+Pass the encrypted database bytes and the encryption key derived from the user's passkey authentication:
+
+```ts
+const dbBytes = new Uint8Array(JSON.parse(localStorage.getItem('vault-db')!));
+
+const result = await client.unlock(dbBytes, encryptionKey);
+
+if (!result.success) {
+  console.error('Unlock failed:', result.error);
+}
+```
+
+The `encryptionKey` is a hex string derived during key generation. If you did not store it separately, re-derive it by calling `authenticatePasskey` and passing the result through the key derivation step in the vault.
+
+## Export the vault
+
+`exportVault` produces an encrypted binary backup of the entire vault — all accounts, credentials, and DID documents — protected with a user-supplied password. Returns a `Uint8Array`.
+
+```ts
+const backup = await client.exportVault({ password: 'correct-horse-battery' });
+
+const blob = new Blob([backup], { type: 'application/octet-stream' });
+const url = URL.createObjectURL(blob);
+```
+
+<Warning>
+  If the vault is locked when you call `exportVault`, the operation throws a `PluginCallError`. Unlock first.
+</Warning>
+
+## Import a vault backup
+
+`importVault` restores a vault from a backup produced by `exportVault`. Provide the raw bytes and the password used during export:
+
+```ts
+const fileBytes = new Uint8Array(await file.arrayBuffer());
+
+const result = await client.importVault({
+  data: fileBytes,
+  password: 'correct-horse-battery',
+});
+
+if (result.success) {
+  console.log(`Restored DID: ${result.did}`);
+  console.log(`Accounts: ${result.accounts}, Credentials: ${result.credentials}`);
+} else {
+  console.error('Import failed:', result.error);
+}
+```
+
+If the password is wrong or the file is corrupt, `result.success` is `false` and `result.error` describes the failure.
+
+## Check for a persisted vault
+
+If your client was created with `createClient` (which sets up the core bridge), you can check whether a vault has been previously persisted to durable storage:
+
+```ts
+const exists = await client.hasPersistedVault();
+if (!exists) {
+  // First-time setup — no vault to restore
+}
+```
+
+This method requires the core bridge. It returns `false` if the client was constructed without it.
+
+## Snapshot the vault to IPFS
+
+`snapshotVault` pins the current vault state to IPFS via the relay service and returns a CID:
+
+```ts
+const result = await client.snapshotVault();
+
+if ('cid' in result) {
+  console.log('Snapshot CID:', result.cid);
+} else {
+  console.error('Snapshot failed:', result.error);
+}
+```
+
+## Force an immediate persistence write
+
+The vault background worker persists on a schedule. To force an immediate write to durable storage:
+
+```ts
+const result = await client.persistNow();
+
+if (!result.success) {
+  console.error('Persist failed:', result.error);
+}
+```
+
+Both `snapshotVault` and `persistNow` require the core bridge. They return error objects rather than throwing if the bridge is unavailable.
+
+## Backup and restore workflow
+
+A complete backup/restore cycle:
+
+```ts
+// --- Backup ---
+const backup = await client.exportVault({ password: userPassword });
+await uploadToCloudStorage(backup);
+
+// --- Restore ---
+const bytes = await downloadFromCloudStorage();
+const result = await client.importVault({ data: bytes, password: userPassword });
+
+if (result.success) {
+  await client.unlock(bytes, derivedEncryptionKey);
+}
+```

@@ -1,0 +1,105 @@
+---
+title: "Device Sync"
+description: "Transfer an existing HyperAuth identity to a new device using the three-step sync protocol."
+icon: "arrows-rotate"
+---
+
+This guide shows you how to sync an existing identity from one device to another using the three-step sync protocol: Device A initiates, Device B responds, and both complete the exchange.
+
+## Overview
+
+The sync protocol is a three-message key exchange. Device A (the existing device) generates an ephemeral session and shares a session ID and public key. Device B (the new device) responds with its own public key. Device A completes the handshake, and both sides derive a shared encrypted channel through which the vault is transferred.
+
+<Note>
+  All three methods require the vault to be unlocked on the device calling them.
+</Note>
+
+## Step 1 — Device A initiates
+
+On the device that already has the identity, call `syncInit`. This creates a sync session and returns a session ID and a public key to share with Device B.
+
+```ts
+const init = await client.syncInit('My Laptop', 3600); // label, expiry in seconds
+// init.session_id  — share this with Device B
+// init.public_key  — share this with Device B
+```
+
+`label` is an optional human-readable name for the session. `expiresIn` is the session lifetime in seconds; pass `0` or omit it to use the server default.
+
+Share `init.session_id` and `init.public_key` with Device B via any side channel — QR code, copy-paste, or your application's own handshake UI.
+
+## Step 2 — Device B responds
+
+On the new device, call `syncRespond` with the session ID and the public key received from Device A. This returns Device B's own public key, which must be sent back to Device A.
+
+```ts
+const response = await clientB.syncRespond(
+  init.session_id,
+  init.public_key,
+);
+// response.public_key — send this back to Device A
+```
+
+Device B does not need an existing identity to call `syncRespond`. The vault can be in a fresh, uninitialized state.
+
+## Step 3 — Both devices complete
+
+Device A calls `syncComplete` with the session ID and Device B's public key. Device B also calls `syncComplete` with the session ID (Device B's remote public key argument is optional at this stage).
+
+**On Device A:**
+
+```ts
+const completeA = await clientA.syncComplete(
+  init.session_id,
+  response.public_key,
+);
+```
+
+**On Device B:**
+
+```ts
+const completeB = await clientB.syncComplete(init.session_id);
+```
+
+After both calls return successfully, Device B's vault contains the transferred identity.
+
+## Full example
+
+```ts
+// ---- Device A ----
+const init = await clientA.syncInit('iPhone', 600);
+
+// Transmit to Device B (QR code, link, etc.)
+const payload = { sessionId: init.session_id, publicKey: init.public_key };
+
+// ---- Device B ----
+const response = await clientB.syncRespond(payload.sessionId, payload.publicKey);
+
+// Transmit response.public_key back to Device A
+
+// ---- Device A ----
+await clientA.syncComplete(payload.sessionId, response.public_key);
+
+// ---- Device B ----
+await clientB.syncComplete(payload.sessionId);
+
+// Device B now has the identity
+```
+
+## Error handling
+
+Each step throws a `PluginCallError` if the vault operation fails — for example, if the session ID is not found, has expired, or the key exchange is invalid.
+
+```ts
+import { PluginCallError } from '@hyperauth/sdk';
+
+try {
+  await clientA.syncComplete(sessionId, remotePublicKey);
+} catch (err) {
+  if (err instanceof PluginCallError) {
+    console.error('Sync failed:', err.message);
+  }
+}
+```
+
+If Device B's `syncRespond` call returns successfully but the session expires before Device A calls `syncComplete`, the complete step will fail with a session-not-found error. In that case, restart from `syncInit`.

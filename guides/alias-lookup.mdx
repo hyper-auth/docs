@@ -1,0 +1,140 @@
+---
+title: "Alias Lookup"
+description: "Compute alias hashes, resolve aliases and DIDs via the indexer, and check alias availability before registration."
+icon: "magnifying-glass"
+---
+
+This guide shows you how to resolve human-readable aliases to DIDs, look up on-chain DID and account data, check alias availability before registration, and fetch indexer statistics.
+
+## Compute an alias hash
+
+The indexer stores aliases as Keccak-256 hashes. Before querying, compute the hash of the alias string:
+
+```ts
+import { computeAliasHash } from '@hyperauth/sdk';
+
+const hash = await computeAliasHash('alice');
+// '0x3d4f...'
+```
+
+By default `computeAliasHash` uses `hash-wasm` (already a dependency). If you already have a Keccak-256 implementation from viem or ethers, pass it to avoid loading a second one:
+
+```ts
+import { keccak256 } from 'viem';
+import { computeAliasHash } from '@hyperauth/sdk';
+
+const hash = await computeAliasHash('alice', keccak256);
+```
+
+## Check alias availability before registration
+
+Before registering a handle, verify that the alias is not already taken. The vault exposes an availability endpoint directly:
+
+```ts
+const res = await fetch(`/api/aliases/check?alias=${encodeURIComponent('alice')}`);
+const { available, did } = await res.json();
+
+if (!available) {
+  console.log('Alias taken by DID:', did);
+}
+```
+
+Use the indexer for a hash-based lookup instead if you need the full alias record:
+
+```ts
+const hash = await computeAliasHash('alice');
+const alias = await lookupAlias(hash);
+
+if (alias.found) {
+  console.log('Alias hash:', alias.alias_hash);
+  console.log('DID hash:', alias.did_hash);
+  console.log('Active:', alias.active);
+  console.log('Controller:', alias.controller);
+} else {
+  // Alias is available
+}
+```
+
+## Look up a DID
+
+`lookupDid` resolves a DID hash to its on-chain record:
+
+```ts
+import { lookupDid } from '@hyperauth/sdk';
+
+const result = await lookupDid('0xdidHash...');
+
+if (result.found) {
+  console.log('Controller:', result.controller);
+  console.log('Metadata CID:', result.metadata_cid);
+  console.log('Active:', result.active);
+  console.log('Block number:', result.block_number);
+  console.log('Tx hash:', result.tx_hash);
+}
+```
+
+The DID hash is the Keccak-256 hash of the DID string. It is returned in `RegistrationResult.did_hash` after registration, and available in `QueryOutput.did` from `client.query()`.
+
+## Look up a smart account
+
+`lookupAccount` resolves a smart account address to its on-chain indexer record:
+
+```ts
+import { lookupAccount } from '@hyperauth/sdk';
+
+const result = await lookupAccount('0xSmartAccountAddress');
+
+if (result.found) {
+  console.log('Account address:', result.account_address);
+  console.log('Owner address:', result.owner_address);
+  console.log('Block number:', result.block_number);
+  console.log('Tx hash:', result.tx_hash);
+}
+```
+
+## Fetch indexer statistics
+
+`fetchStats` returns aggregate counts for the entire registry:
+
+```ts
+import { fetchStats } from '@hyperauth/sdk';
+
+const stats = await fetchStats();
+
+console.log('Total DIDs:', stats.total_dids);
+console.log('Active DIDs:', stats.active_dids);
+console.log('Total aliases:', stats.total_aliases);
+console.log('Total accounts:', stats.total_accounts);
+console.log('Last indexed block:', stats.last_block_number);
+```
+
+## Use a custom indexer URL
+
+All indexer functions default to `/api/indexer` (the vault's indexer proxy). Pass a custom URL as the last argument to target a different deployment:
+
+```ts
+const hash = await computeAliasHash('alice');
+const alias = await lookupAlias(hash, 'https://indexer.example.com/api');
+const did = await lookupDid(didHash, 'https://indexer.example.com/api');
+const account = await lookupAccount(address, 'https://indexer.example.com/api');
+const stats = await fetchStats('https://indexer.example.com/api');
+```
+
+## Error handling
+
+All indexer functions throw a `NetworkError` if the HTTP request fails. They do not throw on a not-found result — check the `found` field instead.
+
+```ts
+import { NetworkError } from '@hyperauth/sdk';
+
+try {
+  const alias = await lookupAlias(hash);
+  if (!alias.found) {
+    // Not registered
+  }
+} catch (err) {
+  if (err instanceof NetworkError) {
+    console.error('Indexer unreachable:', err.message);
+  }
+}
+```

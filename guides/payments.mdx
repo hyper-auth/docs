@@ -1,0 +1,104 @@
+---
+title: "Payments"
+description: "Submit gasless ERC-4337 payments from a HyperAuth smart account using the SDK's built-in payment methods."
+icon: "credit-card"
+---
+
+This guide shows you how to register the HyperAuth payment service worker and submit payments from a user's smart account. Payments are signed locally in the signer worker and submitted directly to the Pimlico bundler — no server proxy is required.
+
+## Register the payment handler
+
+Register the payment service worker once during app initialisation, before any payment flow. This enables the browser's Payment Request API to discover HyperAuth as a payment method.
+
+```ts
+const registration = await client.registerPaymentHandler();
+
+if (!registration.success) {
+  console.error('Payment handler registration failed:', registration.error);
+}
+```
+
+By default `registerPaymentHandler` registers the service worker at `/pay/sw.js` with scope `/pay/` and the payment method URL `https://did.run/pay`. Override any of these if your deployment differs:
+
+```ts
+const registration = await client.registerPaymentHandler({
+  swUrl: '/pay/sw.js',
+  scope: '/pay/',
+  methodUrl: 'https://did.run/pay',
+});
+```
+
+If the browser does not support service workers, `registerPaymentHandler` returns `{ success: false, error: 'Service workers not supported' }` rather than throwing.
+
+## Submit a payment
+
+`submitPayment` builds and signs an ERC-4337 UserOperation that transfers tokens to the recipient, submits it to the bundler, and returns the user operation hash and an explorer URL.
+
+The vault must be unlocked to sign the payment. Signing happens inside the Dedicated Worker running `enclave.wasm`; the signed operation is then submitted directly to the Pimlico bundler endpoint.
+
+```ts
+const result = await client.submitPayment({
+  to: '0xRecipientAddress',
+  amount: '1000000',        // in the token's smallest unit (e.g. 1 USDC = 1000000)
+  token: '0xTokenAddress',  // ERC-20 contract address, or 'native' for ETH
+  chainId: 84532,           // Base Sepolia
+});
+
+console.log(result.userOpHash);
+console.log(result.txHash);
+console.log(result.explorerUrl);
+```
+
+If you need to constrain the payment with a UCAN delegation — for example, to enforce a spending limit — pass the delegation token:
+
+```ts
+const result = await client.submitPayment({
+  to: recipientAddress,
+  amount: '5000000',
+  token: usdcAddress,
+  chainId: 84532,
+  ucan: delegationToken,
+  label: 'Coffee subscription',
+});
+```
+
+The `label` field is optional and for your own record-keeping only.
+
+## Supported chains
+
+The explorer URL is automatically set based on `chainId`:
+
+| Chain ID | Explorer |
+|---|---|
+| `8453` | basescan.org |
+| `84532` | sepolia.basescan.org |
+| `1` | etherscan.io |
+
+For any other chain ID, the URL defaults to etherscan.io.
+
+## Error handling
+
+`submitPayment` throws a `PluginCallError` if signing fails (e.g. vault is locked) or if the bundler rejects the operation.
+
+```ts
+import { PluginCallError } from '@hyperauth/sdk';
+
+try {
+  const result = await client.submitPayment({ to, amount, token, chainId });
+} catch (err) {
+  if (err instanceof PluginCallError) {
+    console.error('Payment failed:', err.message);
+  }
+}
+```
+
+`submitPayment` does not wait for on-chain confirmation. To wait for the UserOp to be included in a block, use `waitForReceipt` with the returned `userOpHash`:
+
+```ts
+import { waitForReceipt } from '@hyperauth/sdk';
+
+const result = await client.submitPayment({ to, amount, token, chainId });
+const receipt = await waitForReceipt(result.userOpHash);
+
+console.log('Confirmed:', receipt.success);
+```

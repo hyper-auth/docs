@@ -1,0 +1,205 @@
+---
+title: "Smart Accounts"
+description: "Predict account addresses, inspect on-chain state, build and send ERC-4337 UserOps, and wait for receipts."
+icon: "wallet"
+---
+
+This guide shows you how to work with ERC-4337 smart accounts linked to a HyperAuth identity — from predicting the account address before deployment through signing, sponsoring, and confirming a UserOperation.
+
+## Predict the smart account address
+
+Before the account is deployed on-chain you can predict its deterministic address from the passkey's public key coordinates.
+
+```ts
+import { getSmartAccountAddress } from '@hyperauth/sdk';
+
+const address = await getSmartAccountAddress({
+  pubKeyX: '0xabc123...', // P-256 public key X coordinate (hex)
+  pubKeyY: '0xdef456...', // P-256 public key Y coordinate (hex)
+});
+```
+
+The `pubKeyX` and `pubKeyY` values come from the identity's verification method, available after calling `client.query()`. Pass a `salt` to derive alternative account addresses from the same key pair:
+
+```ts
+const address = await getSmartAccountAddress({ pubKeyX, pubKeyY, salt: 1 });
+```
+
+If you run a self-hosted vault, pass `vaultUrl` to point at your own deployment:
+
+```ts
+const address = await getSmartAccountAddress({
+  pubKeyX,
+  pubKeyY,
+  vaultUrl: 'https://vault.example.com/api',
+});
+```
+
+## Inspect on-chain account state
+
+`getAccountState` reads the deployed account's on-chain state — nonce, associated DID, active status, and public key.
+
+```ts
+import { getAccountState } from '@hyperauth/sdk';
+
+const state = await getAccountState({ account: '0xabc...' });
+
+console.log(state.nonce);
+console.log(state.did);
+console.log(state.isActive);
+console.log(state.pubKeyX);
+console.log(state.pubKeyY);
+```
+
+If you need to know whether an account has been deployed yet, check `state.isActive`. A newly predicted address that has not been used returns `isActive: false`.
+
+## Sign a UserOperation
+
+`signUserOp` reads the account's encrypted key material from the vault and produces a WebAuthn-compatible ERC-4337 signature. The vault must be unlocked.
+
+```ts
+import type { UserOp } from '@hyperauth/sdk';
+
+const userOp: UserOp = {
+  sender: '0xabc...',
+  nonce: '0x0',
+  callData: '0x...',
+  callGasLimit: '0x0',
+  verificationGasLimit: '0x0',
+  preVerificationGas: '0x0',
+  maxFeePerGas: '0x0',
+  maxPriorityFeePerGas: '0x0',
+  signature: '0x',
+};
+
+const { signature, user_op_hash } = await client.signUserOp(userOp);
+const signedOp = { ...userOp, signature };
+```
+
+## Estimate gas
+
+Before submitting, get gas estimates from the bundler:
+
+```ts
+import { estimateUserOpGas } from '@hyperauth/sdk';
+
+const gas = await estimateUserOpGas(userOp);
+
+const opWithGas: UserOp = {
+  ...userOp,
+  preVerificationGas: gas.preVerificationGas,
+  verificationGasLimit: gas.verificationGasLimit,
+  callGasLimit: gas.callGasLimit,
+};
+```
+
+## Sponsor gas with a paymaster
+
+To make the transaction gasless for the user, call `sponsorUserOp`. This calls the paymaster's `pm_sponsorUserOperation` method and returns the UserOp with paymaster fields populated. It also fills in gas estimates internally, so there is no need to call `estimateUserOpGas` first.
+
+```ts
+import { sponsorUserOp } from '@hyperauth/sdk';
+
+const sponsoredOp = await sponsorUserOp(userOp);
+```
+
+Sign after sponsoring:
+
+```ts
+const { signature } = await client.signUserOp(sponsoredOp);
+const readyOp = { ...sponsoredOp, signature };
+```
+
+## Send the UserOperation
+
+```ts
+import { sendUserOp } from '@hyperauth/sdk';
+
+const userOpHash = await sendUserOp(readyOp);
+```
+
+All bundler functions use `/api/bundler` by default. To use a different bundler URL or a non-default entry point:
+
+```ts
+const userOpHash = await sendUserOp(
+  readyOp,
+  '0xEntryPointAddress',
+  'https://bundler.example.com',
+);
+```
+
+## Wait for confirmation
+
+`waitForReceipt` polls the bundler until the UserOperation is confirmed or the timeout expires (default 120 seconds).
+
+```ts
+import { waitForReceipt } from '@hyperauth/sdk';
+
+const receipt = await waitForReceipt(userOpHash);
+
+console.log(receipt.success);
+console.log(receipt.receipt.transactionHash);
+console.log(receipt.actualGasUsed);
+```
+
+Adjust polling behaviour:
+
+```ts
+const receipt = await waitForReceipt(userOpHash, {
+  timeout: 60_000,
+  interval: 2_000,
+});
+```
+
+## Fetch a receipt directly
+
+If you already have the hash and want a one-shot check without polling:
+
+```ts
+import { getUserOpReceipt } from '@hyperauth/sdk';
+
+const receipt = await getUserOpReceipt(userOpHash);
+if (!receipt) {
+  // Not yet confirmed
+}
+```
+
+## Full UserOp lifecycle example
+
+```ts
+import {
+  getSmartAccountAddress,
+  sponsorUserOp,
+  sendUserOp,
+  waitForReceipt,
+} from '@hyperauth/sdk';
+
+// 1. Predict address
+const sender = await getSmartAccountAddress({ pubKeyX, pubKeyY });
+
+// 2. Build a minimal UserOp
+const userOp: UserOp = {
+  sender,
+  nonce: '0x0',
+  callData: encodedCallData,
+  callGasLimit: '0x0',
+  verificationGasLimit: '0x0',
+  preVerificationGas: '0x0',
+  maxFeePerGas: '0x0',
+  maxPriorityFeePerGas: '0x0',
+  signature: '0x',
+};
+
+// 3. Sponsor (fills gas + paymaster fields)
+const sponsored = await sponsorUserOp(userOp);
+
+// 4. Sign
+const { signature } = await client.signUserOp(sponsored);
+
+// 5. Send
+const hash = await sendUserOp({ ...sponsored, signature });
+
+// 6. Confirm
+const receipt = await waitForReceipt(hash);
+console.log('confirmed:', receipt.success);
+```

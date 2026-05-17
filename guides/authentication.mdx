@@ -1,0 +1,146 @@
+---
+title: "Authentication"
+description: "Create and authenticate passkeys, handle errors, and configure auto-lock for the vault."
+icon: "fingerprint"
+---
+
+This guide shows you how to register a new passkey, authenticate a returning user, and manage vault lock state.
+
+## Create a passkey
+
+Call `createPasskey` with the user's handle (their chosen alias or identifier). This triggers the browser's WebAuthn credential creation prompt.
+
+```ts
+import { createPasskey } from '@hyperauth/sdk';
+
+const { credential, credentialId } = await createPasskey('alice');
+```
+
+The returned `credential` is a base64-encoded JSON string ready to pass to `client.generate`. The `credentialId` is the raw WebAuthn credential ID — store it if you need to link passkeys across sessions.
+
+If you need to prevent duplicate passkeys on the same device, pass the existing credential IDs in `excludeCredentials`:
+
+```ts
+const { credential, credentialId } = await createPasskey('alice', undefined, {
+  excludeCredentials: [
+    { id: existingRawId, type: 'public-key' },
+  ],
+});
+```
+
+If the passkey creation fails due to a cancelled prompt or an unsupported algorithm, `createPasskey` throws a `WebAuthnError`. The error message indicates whether the user cancelled or the authenticator returned an incompatible algorithm (HyperAuth requires ES256 / P-256).
+
+```ts
+import { WebAuthnError } from '@hyperauth/sdk';
+
+try {
+  const result = await createPasskey('alice');
+} catch (err) {
+  if (err instanceof WebAuthnError) {
+    console.error(err.message);
+  }
+}
+```
+
+## Generate an identity from the passkey
+
+After creating a passkey, pass the serialized credential to the vault to derive the identity and write it to the encrypted database:
+
+```ts
+const result = await client.generate(credential, {
+  identifier: 'alice',
+  channel: 'handle',
+});
+```
+
+## Authenticate a returning user
+
+`authenticatePasskey` prompts the user to select and verify an existing passkey. It returns the credential ID of the selected passkey.
+
+```ts
+import { authenticatePasskey } from '@hyperauth/sdk';
+
+const credentialId = await authenticatePasskey();
+```
+
+If you serve from a custom domain, pass the relying party ID explicitly:
+
+```ts
+const credentialId = await authenticatePasskey('auth.example.com');
+```
+
+Use the returned credential ID to locate the user's encrypted vault database, then load it:
+
+```ts
+const database = await fetchVaultDatabase(credentialId);
+await client.load(database);
+```
+
+## Check lock status before operations
+
+If you need to check whether the vault is locked before performing an operation:
+
+```ts
+const locked = await client.isLocked();
+if (locked) {
+  // Prompt the user to re-authenticate
+}
+```
+
+`isLocked` calls `client.status()` internally. If you also need additional status fields, call `status` directly:
+
+```ts
+const { locked, did, boot } = await client.status();
+```
+
+## Unlock after lock
+
+If the vault has been locked (by auto-lock or an explicit call), unlock it by supplying the database bytes and the encryption key derived from the passkey:
+
+```ts
+const result = await client.unlock(databaseBytes, encryptionKey);
+if (!result.success) {
+  console.error('Unlock failed:', result.error);
+}
+```
+
+## Configure auto-lock
+
+By default the vault locks after 5 minutes of inactivity. Set a custom timeout at creation time:
+
+```ts
+const client = await createClient({
+  autoLockTimeout: 10 * 60 * 1000, // 10 minutes
+});
+```
+
+Set it to `0` to disable auto-lock entirely:
+
+```ts
+const client = await createClient({ autoLockTimeout: 0 });
+```
+
+To change the timeout after client creation:
+
+```ts
+client.setAutoLockTimeout(2 * 60 * 1000); // 2 minutes
+```
+
+Register a callback to be notified when auto-lock fires. The callback receives the encrypted database bytes so you can persist them:
+
+```ts
+client.setAutoLockCallback((database) => {
+  localStorage.setItem('vault', JSON.stringify(database));
+});
+```
+
+## Lock explicitly
+
+Call `lock` directly when the user signs out or navigates away:
+
+```ts
+const result = await client.lock();
+if (result.success && result.database) {
+  localStorage.setItem('vault', JSON.stringify(Array.from(result.database)));
+}
+```
