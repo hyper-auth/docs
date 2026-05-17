@@ -1,0 +1,48 @@
+---
+title: Decentralized Identifiers in HyperAuth
+description: What DIDs are, why they matter for self-sovereign identity, and how HyperAuth implements them — from generation in the signer worker to on-chain registration in the DIDRegistry contract.
+---
+
+The core problem that decentralized identifiers solve is not a technical one — it is a question of control. Every identity system requires some authority that decides who you are. Traditional systems locate that authority in a server: Google decides whether your Gmail account is valid, a bank decides whether your account number refers to you, a government decides whether your passport is legitimate. The defining characteristic of each is that the authority can unilaterally revoke, suspend, or reassign your identity. You are a tenant, not an owner.
+
+A decentralized identifier shifts that authority to the identifier itself and to the cryptographic key that controls it. A DID is valid not because a server endorses it, but because the holder can prove control of the key that created it. The identifier is permanent in a way that a username cannot be: once anchored to a blockchain, it exists as long as the chain exists, independent of any company, service, or administrator.
+
+## The structure of a DID
+
+A DID is a URI. Its generic form is `did:method:method-specific-id`. HyperAuth DIDs follow the pattern `did:hyper:base-sepolia:0x...` where the method is `hyper`, the network is Base Sepolia, and the method-specific identifier is the Ethereum address of the smart account that controls the DID. This structure is not arbitrary: the method specifies how the DID should be resolved, the network specifies which chain to query, and the address provides a globally unique, collision-resistant identifier that can be looked up on-chain.
+
+The DID string itself is hashed before storage. The `DIDRegistry` contract maps `keccak256(did_string)` to a `DidDocument` struct containing the controller address, creation and update timestamps, an optional IPFS CID pointing to the full DID document, and an active flag for revocation. This hash-keyed storage means the full DID string never needs to appear in on-chain calldata after registration — queries use the hash, and the original string can be verified off-chain by hashing and comparing.
+
+## Generation in the signer worker
+
+DID generation happens entirely inside the signer's WASM sandbox (`enclave.wasm`), before any network call is made. The `generate` export calls `stateless.MPCGenerate`, which creates a new cryptographic identity: a fresh ECDSA key pair, the private scalar split into two shares (`val_share` and `user_share`), a public key, and an enclave identifier. The DID string is derived from this material — specifically, the Ethereum address portion comes from the public key coordinates, which are deterministically computed from the key pair.
+
+This ordering matters. The DID exists before on-chain registration. It is generated locally, as a cryptographic fact, and only then submitted to the blockchain for anchoring. A user who completes key generation but whose on-chain transaction fails still has a valid DID from the signer's perspective — they simply have not yet published their control of it to a place where strangers can verify it. The distinction between existence and discoverability is fundamental to how the system handles partial failures during registration.
+
+## The four linked identities
+
+A fully registered HyperAuth user exists simultaneously as four different kinds of identity, and understanding the relationships between them explains how the system achieves both usability and verifiability.
+
+The alias is a human-readable string — a handle chosen during registration, normalized to lowercase, and hashed before storage. Aliases are stored in `DIDRegistry` as `aliases[aliasHash] => didHash`, a bidirectional mapping that lets the system look up a DID from a handle and confirm a handle from a DID. The alias hash is also checked for uniqueness before the registration transaction is submitted, which is why the first step of the registration pipeline queries the registry. Aliases are not globally unique in the way that Ethereum addresses are; they are unique within the scope of this registry contract. Two different deployments of HyperAuth on different chains could have the same alias pointing to different DIDs.
+
+The DID is the persistent cryptographic identity. It is a URI that encodes the network and the controlling address. Once registered in `DIDRegistry`, the DID's `controller` field points to the smart account address, and the `controllerToDid` reverse mapping allows any observer to look up the DID for a given smart account.
+
+The smart account is an ERC-4337 account abstraction contract deployed at a deterministic address computed from the user's passkey public key coordinates and a salt. The `HyperAuthFactory.getAddress` function implements the `CREATE2` address precomputation: given `pubKeyX`, `pubKeyY`, and a salt, it hashes the account creation bytecode and the salt to produce an address that the account will occupy once deployed. This means the smart account address is known before deployment — it can be included in the DID string, used as the DID controller, and referenced in on-chain calldata, all before the `createAccount` transaction executes.
+
+The passkey credential is a WebAuthn credential stored by the user's authenticator (device, password manager, or security key). After registration, the credential ID serves as the lookup key when an existing user tries to authenticate: the credential ID from the WebAuthn assertion is used to identify the returning user and retrieve their vault state, which contains the DID and encrypted key shares needed for subsequent signing operations.
+
+## On-chain registration and why it matters
+
+The `DIDRegistry.register` function is called not directly by the user's wallet, but as the calldata payload of an ERC-4337 UserOperation. The UserOperation's `callData` encodes an `execute` call on the smart account, which in turn calls `DIDRegistry.register` with the DID hash, alias hash, and metadata CID. This indirection is intentional: the smart account is the `msg.sender` when `register` is called, which means the DID's controller is automatically set to the smart account address. The relationship between DID and controller is established atomically in the same transaction that creates the account.
+
+On-chain registration provides three things that off-chain storage cannot. Permanence: the record exists as long as the chain exists and cannot be deleted by a server operator. Discoverability: any observer with access to the chain can verify a DID's existence, controller, and alias without asking a trusted third party. Control: only the controller — the smart account — can update or deactivate the DID, and the smart account itself only accepts operations signed by the passkey. The chain of custody runs from the user's biometric gesture through the passkey signature through the smart account's `_validateSignature` check to the DID registry mutation.
+
+## Resolution
+
+DID resolution is the process of taking a DID string and returning the information needed to interact with the identity. For HyperAuth DIDs, resolution involves looking up `keccak256(did_string)` in the `DIDRegistry` to retrieve the `DidDocument`, which provides the controller address and optionally an IPFS CID pointing to the full W3C-compliant DID document with verification methods, service endpoints, and authentication keys.
+
+Resolution can be performed by any caller with access to the chain via a standard RPC endpoint — no HyperAuth-operated service is required. The `DIDRegistry` contract emits `DIDRegistered` and `AliasRegistered` events, so any indexer can maintain a queryable projection of registered DIDs for applications that need fast reverse lookups without constructing raw RPC calls. Such an indexer's responses can always be independently verified against the chain; the chain remains the authoritative source.
+
+## Deactivation and control
+
+The `DIDRegistry.deactivate` function sets the `active` flag to false and cleans up the alias mappings. Only the controller can call it. Deactivation is not deletion: the record remains in the mapping, the history remains in the event log, and the DID hash continues to resolve — but resolvers are expected to check the `active` flag and treat an inactive DID as revoked. This is the mechanism by which a user can explicitly abandon an identity without erasing its history, which matters for auditability and for applications that need to know whether a previously valid DID is still in active use.

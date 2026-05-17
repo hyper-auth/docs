@@ -1,0 +1,107 @@
+---
+title: System Architecture
+description: Why HyperAuth is built the way it is — the dual-worker model, the split between stateless signer and stateful vault, OPFS persistence without SharedArrayBuffer, and the decision to run cryptography inside SQLite.
+---
+
+HyperAuth is an identity system that wants to satisfy two properties that are almost always in tension: it should work when the user is offline, and it should be verifiable by parties who have never met the user. Most identity systems satisfy one of these by sacrificing the other. A server-side database of credentials is trivially verifiable but fails when the network is unavailable or when you want to stop trusting the server. A purely local secret works offline but tells strangers nothing. The architecture of HyperAuth is largely a series of design decisions that try to hold both properties simultaneously.
+
+## The shape of the system
+
+The component pipeline runs left to right across a trust gradient. On the leftmost end sits the stateless signer — a Go WASM module (`enclave.wasm`) that performs pure cryptographic operations. Moving rightward, the stateful vault (`vault.wasm`) owns the SQLite-backed identity store, vault import and export, and cross-tab sync state. The TypeScript SDK bridges both WASM modules into promises the rest of the application can consume. React hooks sit above the SDK, turning multi-step registration and signing operations into observable state machines. At the far right sits the blockchain, which anchors DIDs and validates passkey signatures without trusting any of the layers below.
+
+Nothing in this pipeline is accidental. Both WASM modules run inside browser workers — isolated from the main JavaScript thread and from each other. The TypeScript SDK does not re-implement cryptography; it routes JSON-serialized inputs into the appropriate worker and routes the outputs back out. The chain trusts only what can be cryptographically verified; no server-signed token or session cookie can authorize on-chain operations.
+
+The system has no HyperAuth-operated edge layer. There is no Cloudflare Worker coordinating sessions, no Durable Object holding per-user state, no Neon Postgres indexer that the system depends on for correctness. The trust gradient runs from the user's device directly to the chain, with the two browser workers as the only intermediaries.
+
+## Two WASM modules, two browser workers
+
+### The stateless signer
+
+`enclave.wasm` (~9 MB) is a pure cryptographic primitive. It is loaded inside a **Dedicated Worker** — one per tab, no coordination required. The signer exposes seven `//go:wasmexport` functions: `ping`, `generate`, `sign`, `verify`, `derive_address`, `mint_ucan`, and `parse_webauthn`. It holds no database, no DID document, and no per-user state. Every call is self-contained: inputs come in over the Extism plugin development kit, outputs go back out, and nothing persists between calls.
+
+The choice of a Dedicated Worker is deliberate. Because the signer is stateless, there is nothing to share between tabs — every tab can spawn its own signer without coordination cost or consistency concerns. Dedicated Workers also avoid the cross-origin isolation constraints that SharedArrayBuffer imposes: no `COOP+COEP` headers are required to load `enclave.wasm`.
+
+The main-thread bridge to the signer is `createSignerBridge`, which spawns `signer-worker.js`, awaits the initial WASM boot, and returns a `SignerHandle` containing a Comlink proxy of `SignerApi` and a `dispose()` function. Disposing terminates the Dedicated Worker and releases the Comlink proxy.
+
+### The stateful vault
+
+`vault.wasm` (~40 MB) is the persistent counterpart. It is loaded inside a **SharedWorker** — one per origin, shared across all tabs. The vault exposes twelve `//go:wasmexport` functions: `ping`, `load`, `exec`, `query`, `lock`, `unlock`, `status`, `export_vault`, `import_vault`, `sync_init`, `sync_respond`, and `sync_complete`. It owns the SQLite-backed identity store via `ncruces/go-sqlite3` and the OPFS file lock that serializes access to it.
+
+The SharedWorker model gives the vault exclusive write access to the OPFS-backed database: the first tab to connect spawns the SharedWorker and acquires the file lock; subsequent tabs connect to the same instance via `MessagePort` and proxy their `exec` and `query` calls through it. There is no contention, no serialization conflict, and no need for the caller to know which tab originated the connection.
+
+The main-thread bridge to the vault is `createVaultBridge`, which creates a `SharedWorker` from `vault-worker.js`, starts the port, and returns a `VaultHandle` containing a Comlink proxy of `VaultHostApi` and a `dispose()` function. Disposing releases the Comlink proxy and closes the port; the SharedWorker itself persists until all tabs disconnect.
+
+### The dual-worker client
+
+`createClient` spawns both workers in parallel and constructs a `HyperAuthClient` that orchestrates them. Internally, `HyperAuthClient` holds a `SignerProxy` and a `VaultProxy` and routes calls through a `DualWorkerAdapter` that maps function names to the correct worker. Stateless operations — `sign`, `verify`, `derive_address`, `mint_ucan`, `parse_webauthn` — go to the signer. Stateful operations — `load`, `exec`, `query`, `lock`, `unlock`, `status`, `export_vault`, `import_vault`, `sync_init`, `sync_respond`, `sync_complete` — go to the vault. Composite operations like `generate`, which calls `generate` on the signer, then `parseWebAuthn`, then `deriveAddress`, are orchestrated explicitly inside `HyperAuthClient` rather than routed through the adapter, so the composition is visible at the call site.
+
+## The enclave exports, split by concern
+
+The signer's seven exports cover the stateless cryptographic surface:
+
+- `generate` — calls `stateless.MPCGenerate`, which creates a fresh ECDSA key pair on the K256 curve and splits the private scalar into `val_share` and `user_share`. Returns the enclave ID, both shares, the public key, and the public key hex. The key is never assembled outside the WASM linear memory.
+- `sign` — accepts encrypted shares and data, imports the enclave via `mpc.ImportSimpleEnclave`, reconstructs the private scalar inside the sandbox for the duration of the call, produces a 64-byte normalized P-256 signature, and discards the scalar.
+- `verify` — verifies a signature against a public key without touching key material.
+- `derive_address` — computes the Ethereum address from a public key hex string.
+- `mint_ucan` — accepts encrypted shares and a UCAN payload, imports the enclave, and seals the UCAN envelope using `stateless.UCANSeal`.
+- `parse_webauthn` — parses a WebAuthn credential response, extracting the credential ID and public key coordinates.
+- `ping` — health check.
+
+The vault's twelve exports cover the stateful persistence surface. `exec` dispatches write actions against the identity store (resource/action/subject filter syntax, same as the enclave's `exec` in the previous architecture). `query` returns the DID document. `load` hydrates the vault from a serialized database blob. `lock` and `unlock` manage the encrypted-at-rest state. `status` returns the current lock and initialization flags. `export_vault` and `import_vault` handle encrypted portability snapshots. `sync_init`, `sync_respond`, and `sync_complete` manage the X25519 ECDH handshake for device-to-device vault sync.
+
+## Cryptography as SQL functions
+
+The most unusual decision in the architecture is that cryptographic operations — key generation, signing, verification, and share rotation — are registered as custom SQLite functions rather than as ordinary Go functions. The vault's `keybase` package calls `RegisterMPCFunctions` at initialization, which wires four callbacks — `mpc_generate`, `mpc_sign`, `mpc_verify`, and `mpc_refresh` — into the SQLite connection using `conn.CreateFunction`.
+
+The reason this works, and the reason it is safe in this context, is the threading model of WASM compiled under `wasip1`. WASM with the wasip1 target is single-threaded. There are no goroutines, no concurrent requests, no race conditions between the SQLite callback and the Go mutex ordinarily needed to protect shared state. The code comment in `functions.go` is explicit about this: callbacks must not acquire `kb.mu` because a deadlock is possible if the caller already holds it, and that risk is only acceptable because the single-threaded guarantee eliminates the class of races that would otherwise make this pattern dangerous.
+
+The practical benefit of this design is that a DID operation expressed as SQL — something like `INSERT INTO accounts SELECT mpc_generate()` — becomes atomic from the database's perspective. The cryptographic operation and the state mutation happen inside the same transaction. You cannot get a generated key that fails to be recorded, or a recorded key that was never generated. The SQL transaction and the crypto operation succeed or fail together.
+
+The `mpc_refresh` function deserves special mention because it is the mechanism for share rotation. It reconstructs the private key from the existing shares, splits it again into two new random shares, and updates the database row in place. The public key and all derived addresses remain identical after a refresh — nothing visible to the outside world changes — but the share values that could be stolen or compromised are replaced. This allows the system to implement forward secrecy for stored key material without requiring the user to re-register.
+
+## The persistence layer
+
+The system uses two data surfaces, both client-side.
+
+The vault SQLite database is the primary identity store. It runs inside the vault WASM module and is backed by OPFS via `AccessHandlePoolVFS` — synchronous OPFS access through `FileSystemSyncAccessHandle`. This VFS was chosen specifically because `FileSystemSyncAccessHandle` does not require `SharedArrayBuffer` and therefore does not require the `COOP+COEP` cross-origin isolation headers that the previous `IDBBatchAtomicVFS` approach needed. Any origin can load `vault.wasm` without adding cross-origin isolation headers to their server configuration.
+
+The vault database holds the key material (as MPC shares), the DID, verification methods, linked accounts, credentials, UCAN delegations, and sync session state. Nothing in this database is ever transmitted to a server in decrypted form. The `export_vault` export returns the encrypted database blob — opaque bytes that are only meaningful to someone who can unlock the vault.
+
+OPFS-backed snapshots provide durability across browser restarts. The `AccessHandlePoolVFS` implementation manages the pool of sync access handles that the SharedWorker uses to persist the database to the origin-private file system. The file lock is held by the SharedWorker for as long as any tab in the origin is connected; releasing all ports causes the SharedWorker to terminate and release the lock.
+
+There is no longer a Cloudflare D1 layer or a Neon Postgres indexer that HyperAuth itself owns. The `apps/portal` application uses its own session database for portal-internal concerns, but that is scoped to the portal and is not part of the core identity system.
+
+## WASM artifacts and R2 hosting
+
+Both WASM artifacts are hosted on a single Cloudflare R2 bucket (`hyperauth-wasm`) under versioned and `latest/` prefixes:
+
+```
+hyperauth-wasm/
+  wasm/
+    <version>/
+      enclave.wasm
+      vault.wasm
+    latest/
+      enclave.wasm
+      vault.wasm
+```
+
+Applications consume the artifacts via `VITE_WASM_BASE_URL`. In production, this points at `https://cdn.hyperauth.org/wasm/<version>`. In local development, `predev` and `prebuild` hooks copy the freshly built artifacts from `core/<name>/dist/` into the app's `public/` directory, and Vite serves them from relative paths. If `VITE_WASM_BASE_URL` is unset, the SDK falls back to the relative paths `/enclave.wasm` and `/vault.wasm`.
+
+Apps opt in to the artifacts they need. `apps/portal` requests both `enclave` and `vault` because it runs the full `HyperAuthClient`. `apps/policy` requests only `enclave` because it is a signer-only UCAN minter and never touches the vault SharedWorker.
+
+## Why this builds in a specific order
+
+The build dependency graph runs from bottom to top: contracts first, then the enclave and vault WASM modules, then the SDK, then the React hooks, then the portal and policy applications. Contracts must be compiled before anything else because the ABIs they emit are imported by the TypeScript SDK. Both WASM modules must be compiled before the SDK can load them. The React hooks depend on the SDK types. The applications depend on the hooks.
+
+The Turbo pipeline makes this order explicit: `compile:enclave + compile:vault → generate:pkl → generate:types → build (SDK → apps)`. A change to a contract ABI must flow through the SDK, through the hooks, and through any UI that renders the result of a contract call. A change to an enclave export must be reflected in the TypeScript wrapper that calls it. The build order makes the dependency graph visible and enforceable; breaking it produces immediate compilation errors rather than subtle runtime failures discovered in production.
+
+## Offline-first, trust-minimized, local-first
+
+The three design goals are worth naming directly because they explain tradeoffs that might otherwise seem like complications.
+
+Offline-first means the signer can generate a DID, produce signatures, and mint UCANs without any network access. The vault worker can read and write the local identity store without a network connection. The network is required only when the user wants to anchor their DID on-chain, sponsor a transaction, or synchronize across devices. For most cryptographic operations, the network is irrelevant.
+
+Trust-minimized means no HyperAuth-operated infrastructure handles key material or mediates on-chain operations. The trust gradient runs from the user's biometric gesture through the passkey, through the signer worker's WASM sandbox, through the smart account's `_validateSignature` check, to the chain. There is no server in this chain that can be compromised to extract keys or forge signatures.
+
+Local-first means the canonical copy of the user's identity is the OPFS-backed vault on the user's device. The chain is the anchoring surface and the source of truth for discoverability; the vault is the source of truth for the user's own key material. Cross-device sync uses a direct device-to-device ECDH handshake (`sync_init` / `sync_respond` / `sync_complete`) rather than routing through a cloud relay. Applications that need to look up DIDs by alias query the `DIDRegistry` contract directly or through any available RPC endpoint — there is no HyperAuth-operated indexer that must be online for basic identity operations to work.

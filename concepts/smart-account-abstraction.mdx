@@ -1,0 +1,71 @@
+---
+title: Smart Account Abstraction
+description: Why ERC-4337 account abstraction is central to HyperAuth, how HyperAuthFactory and CREATE2 make account addresses deterministic, and how passkey signatures work on-chain via the RIP-7212 P-256 precompile.
+---
+
+Ethereum's original account model has an uncomfortable property for anyone who wants to build a seamless user experience: the only account type that can initiate a transaction is an Externally Owned Account, controlled by a private key, where the transaction fee must be paid in ETH. This means every new user must acquire ETH before they can do anything on-chain, every wallet is a raw private key with no programmable logic, and every authentication mechanism must ultimately reduce to ECDSA over secp256k1 — the single signature scheme Ethereum was built around.
+
+ERC-4337 dissolves all three of these constraints without requiring a protocol change. It does so by introducing a new transaction primitive — the UserOperation — and a set of contracts that process UserOperations as ordinary Ethereum transactions. The result is a system where accounts can be smart contracts with arbitrary validation logic, fees can be paid by a third party (a paymaster), and signature schemes are whatever the account's validation logic chooses to accept. HyperAuth uses this foundation to make passkeys work as first-class on-chain signing keys.
+
+## The EntryPoint as infrastructure
+
+The central contract in ERC-4337 is the EntryPoint, a singleton deployed at a canonical address that the entire ecosystem shares. The EntryPoint is the only contract allowed to call smart accounts' validation and execution methods during UserOperation processing. This is not a permission — it is a structural guarantee. A smart account that only accepts calls from the EntryPoint cannot be manipulated by arbitrary external contracts into executing operations the user did not authorize.
+
+The relationship works as follows. A user constructs a UserOperation — a struct containing the sender address, nonce, calldata, gas parameters, and a signature — and submits it to a bundler. The bundler aggregates UserOperations from its mempool, calls `EntryPoint.handleOps`, and pays the gas cost from its own ETH. The EntryPoint processes each UserOperation by first calling `IAccount.validateUserOp` on the sender account (to verify the signature and nonce), then optionally calling `IPaymaster.validatePaymasterUserOp` (to verify that a paymaster has authorized gas sponsorship), and finally executing the account's calldata. The bundler recoups its gas costs from either the paymaster's deposit or a prefund held by the sender account.
+
+`HyperAuthAccount` extends the `BaseAccount` abstract contract from the `@account-abstraction` package, inheriting the nonce management and EntryPoint interaction that ERC-4337 requires. The only method it overrides is `_validateSignature`, where the signature verification logic lives. Every other aspect of ERC-4337 compliance is handled by the inherited implementation.
+
+## Deterministic deployment with CREATE2
+
+The `HyperAuthFactory` contract provides account deployment via the EVM's `CREATE2` opcode. `CREATE2` is notable because it computes the deployed contract's address from four inputs — the deployer address, a salt, and the hash of the creation bytecode — before the deployment transaction executes. This means the smart account address can be known and used as an identifier before the account exists on-chain.
+
+The factory's `createAccount` function takes three parameters: `pubKeyX`, `pubKeyY`, and a `salt`. It derives the `CREATE2` salt by hashing all three together: `keccak256(abi.encodePacked(pubKeyX, pubKeyY, salt))`. The creation bytecode is the `HyperAuthAccount` bytecode concatenated with ABI-encoded constructor arguments (the EntryPoint address and the two public key coordinates). The predicted address is computed in `getAddress` using the standard `CREATE2` address formula: `keccak256(0xff ++ factory_address ++ salt ++ keccak256(bytecode))` cast to an address.
+
+The significance of this design is that the factory acts as an immutable address oracle. Given a passkey's public key coordinates and a salt, any party can compute the associated smart account address without asking any server. The `derive_address` signer export does exactly this computation locally — the result is fully verifiable client-side. Once an account is deployed, calling `createAccount` again with the same parameters is a no-op: the function checks `addr.code.length > 0` and returns the existing address rather than attempting a duplicate deployment.
+
+The salt parameter currently defaults to zero in the registration pipeline. It exists to support multiple accounts per passkey in the future — a user could derive a second account at `salt = 1` with the same passkey but a different address — without requiring any change to the factory or the account implementation.
+
+## UserOperation lifecycle
+
+A UserOperation passes through five states between its creation and on-chain confirmation. Understanding each state clarifies what the different parties in the system are responsible for.
+
+Construction happens in `stepPrepareUserOp`. The UserOperation is assembled with the sender address (the predicted smart account), the nonce (fetched from `getAccountState`), calldata encoding the DID registration, gas parameter estimates, and optionally `factory` and `factoryData` for account deployment. The `signature` field is set to `0x` — a placeholder that will be replaced after sponsorship.
+
+Estimation and sponsorship happen in `stepSponsorUserOp`. The UserOperation is submitted to the Pimlico paymaster service with its placeholder signature. The paymaster simulates the UserOperation, refines the gas estimates, and appends its own signature to the `paymasterData` field. The paymaster is committing to covering the gas cost for this specific operation with these specific parameters. A UserOperation whose gas limits have been manually inflated beyond what simulation indicates would be rejected by the paymaster.
+
+Signing happens in `stepSignUserOp`. The UserOperation hash is computed by `sdk.computeUserOpHash` using the EntryPoint address, the chain ID, and all fields of the sponsored UserOperation. This is the same hash that `_validateSignature` will receive on-chain. The hash is signed by the signer worker with the user's private key, and the 64-byte signature is placed in the UserOperation's `signature` field.
+
+Submission happens in `stepSubmitUserOp`. The bundler receives the fully formed, sponsor-endorsed, user-signed UserOperation and adds it to its bundle. Submission returns a UserOperation hash — not a transaction hash — because the UserOperation may be included in a bundle with other UserOperations, and the bundle transaction hash is not known until the bundler mines it.
+
+Confirmation happens in `stepWaitForConfirmation`. The bundler's `eth_getUserOperationReceipt` method is polled until the receipt is available. The receipt includes both the UserOperation hash and the transaction hash of the bundle that included it.
+
+## The bundler and paymaster roles
+
+The bundler is an infrastructure operator that runs a mempool for UserOperations, simulates them to verify they will succeed, aggregates them into bundle transactions, submits those transactions to the blockchain, and collects fees. The bundler takes on economic risk — it fronts gas costs and recoups them through the EntryPoint — which is why it simulates UserOperations before accepting them. A UserOperation that fails simulation wastes the bundler's gas with no recourse.
+
+HyperAuth calls the Pimlico bundler API directly from the SDK. There is no server proxy in this path. The SDK's `sponsorUserOp` and `sendUserOp` functions issue RPC calls to Pimlico's endpoint using the API key configured in the application's environment. This is a deliberate consequence of removing the server-side Vault Worker layer: the SDK owns the full UserOperation lifecycle, and the bundler is a standard ERC-4337 infrastructure service rather than a controlled proxy.
+
+The paymaster is an account that has deposited ETH into the EntryPoint and agreed to cover gas costs for UserOperations that meet its criteria. In the registration flow, the paymaster signature in `paymasterData` is what permits the EntryPoint to charge gas to the paymaster's deposit rather than to the user's account. Without a paymaster, a new user with no ETH would need to fund their smart account before submitting any UserOperation — which creates a bootstrapping problem for onboarding. The paymaster breaks this dependency.
+
+## P-256 signatures on-chain
+
+The most technically significant aspect of `HyperAuthAccount` is its `_validateSignature` implementation. The standard Ethereum signature scheme is ECDSA over secp256k1. Passkeys use ECDSA over P-256 (also called secp256r1), a different elliptic curve defined by different parameters. The two schemes are incompatible: a secp256k1 verifier cannot validate a P-256 signature, and vice versa.
+
+Historically, on-chain P-256 verification required a Solidity implementation of the elliptic curve arithmetic, which cost prohibitive amounts of gas. RIP-7212 introduced a precompile — a built-in EVM contract at address `0x100` on Base — that performs P-256 verification in a single `staticcall` for a fixed, affordable gas cost. `LibP256` wraps this precompile:
+
+```solidity
+(bool success, bytes memory result) = P256_VERIFIER.staticcall(abi.encode(hash, r, s, x, y));
+valid = success && result.length >= 32 && abi.decode(result, (uint256)) == 1;
+```
+
+The `_validateSignature` method decodes the 64-byte signature into `(r, s)` components, passes them along with the UserOperation hash and the account's stored public key coordinates to `LibP256.verifySignature`, and returns zero (success) if verification passes or `SIG_VALIDATION_FAILED` if it does not.
+
+There is a subtle requirement baked into the Go signing code that makes this work correctly: the `normalizeLowS` function ensures the `s` component of every signature satisfies `s <= n/2`, where `n` is the curve order. The EVM's ecrecover precompile, OpenZeppelin's signature utilities, and the RIP-7212 precompile all reject signatures with high-`s` values as a defense against signature malleability. A signature that passes Go's `ecdsa.Verify` might still be rejected on-chain if it has a high `s` value; normalization ensures this cannot happen.
+
+## Why passkeys as account owners make sense
+
+The design decision to use passkey public key coordinates directly as the account ownership parameters — rather than, say, deriving an Ethereum address from the passkey and using that — has significant consequences for the security model. The passkey's P-256 public key coordinates are stored as two `uint256` values in the account contract's immutable storage. There is no intermediate key derivation, no wrapping scheme, no session key that the passkey signs. To authorize any on-chain operation, the passkey must directly sign the UserOperation hash.
+
+This means there is no path by which a stolen session cookie, a compromised server, or an intercepted JWT can authorize on-chain operations. The authority chain is: passkey private key (hardware-bound, never exported) → P-256 signature over UserOperation hash → EntryPoint validation via RIP-7212 precompile → smart account execution. Breaking this chain requires either compromising the user's authenticator hardware or forging a P-256 signature with a 256-bit key — computationally infeasible with current technology.
+
+The tradeoff is key recovery. A lost passkey means a lost account, unless the account has been upgraded to add recovery mechanisms (a guardian address, a social recovery scheme, a backup key). The current `HyperAuthAccount` implementation does not include recovery logic. This is a conscious choice at the current stage of development: keeping the contract minimal reduces the attack surface and the audit scope, at the cost of offering no recourse for authenticator loss.

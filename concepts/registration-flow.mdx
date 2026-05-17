@@ -1,0 +1,90 @@
+---
+title: The Registration Pipeline
+description: A deep examination of the twelve-phase registration process — why it is structured as a pipeline rather than a single call, where the failure boundaries are, and what each phase is actually doing and why.
+---
+
+Registration in HyperAuth is not a single operation that either succeeds or fails. It is a pipeline of twelve discrete phases, each with its own preconditions, its own failure modes, and its own effects. Understanding why the pipeline has this structure — why these particular things happen in this particular order — requires understanding that registration is actually four fundamentally different kinds of work bundled into a single user experience: namespace reservation, hardware credential creation, cryptographic identity generation, and on-chain account deployment. Each kind of work lives at a different layer of the stack, is performed by a different party, and can fail for different reasons. The pipeline is the recognition that these cannot be collapsed into a single atomic operation.
+
+## The twelve phases
+
+The phase names, taken directly from the `useRegistration` hook, are: `checking-alias`, `creating-passkey`, `generating-identity`, `predicting-account`, `fetching-account-state`, `creating-registration`, `sponsoring`, `authorizing`, `signing`, `submitting`, `confirming`, and `storing-session`. These are not UI labels invented for display — each corresponds to a function in the hook's implementation that performs a distinct operation against a distinct system.
+
+### Checking alias
+
+The pipeline opens by asking whether the chosen name is available. This is not a courtesy check — it is a necessary precondition that must be verified before the user invests effort in passkey creation. The `stepCheckAlias` function normalizes the alias to lowercase, hashes it with `computeAliasHash`, and calls `lookupAlias` against the on-chain registry. If the alias hash resolves to a DID document with an active controller, the alias is taken and the pipeline halts immediately.
+
+The reason this comes first is asymmetry of cost. Alias checking is cheap and reversible. Passkey creation requires the user's authenticator and produces a credential that the device will store. Generating an identity allocates an enclave ID and computes key material. None of these can be undone. Discovering at step nine that the alias was already taken — after a passkey has been created, a key generated, a transaction prepared, and a sponsorship obtained — would waste all of that work and leave the user's authenticator with a dangling credential that was never used. Fail fast on the one thing that can be checked immediately.
+
+### Creating a passkey
+
+The `stepCreatePasskey` function calls `sdk.createPasskey(normalized)`, which triggers a WebAuthn credential creation ceremony on the user's device. This step requires user interaction — a biometric gesture, a PIN, or a hardware key tap — and is the only step in the pipeline that is fully outside the application's control. The platform authenticator decides whether to create the credential, the user must consent, and the result is an opaque credential object whose private key never leaves the hardware.
+
+This step returns a `credential` and a `credentialId`. The credential is used in the next step to derive the identity. The reason these two steps — alias check and passkey creation — are sequential rather than parallel is that there is no point creating a passkey for an alias that is already taken. But they must also be separate: the alias check returns a result immediately, while passkey creation blocks on user interaction that could take seconds or be abandoned entirely.
+
+### Generating identity
+
+`stepGenerateIdentity` calls `activeClient.generate(credential, { identifier: normalized })`. Inside `HyperAuthClient.generate`, three signer calls are composed explicitly: `signer.generate()` produces the key pair and shares, `signer.parseWebAuthn(credential)` extracts the credential data, and `signer.deriveAddress(publicKeyHex, 'ethereum')` computes the Ethereum address. All three calls go to the **Dedicated Worker** running `enclave.wasm` — the stateless signer — and complete without touching the vault.
+
+The function returns the DID string, the Ethereum address derived from the key, the encrypted shares, the public key hex, and the raw X and Y coordinates of the public key. The X and Y coordinates are significant beyond this step: they are the ownership parameters of the smart account. Every downstream step that references the smart account depends on having these coordinates. This is why `stepGenerateIdentity` is the source of truth for most of the state that flows through the rest of the pipeline, and why the `IdentityState` object is constructed immediately after this step completes and held in React state for the remainder of the flow.
+
+### Predicting the account address
+
+`stepPredictAccount` calls `activeClient.deriveAddress(publicKeyHex, 'ethereum')`, which routes to the `derive_address` signer export. The result is the Ethereum address of the smart account that will be deployed — before it is deployed. This is possible because `HyperAuthFactory` uses `CREATE2`, whose address formula depends only on the factory address, a salt derived from the public key coordinates, and the account creation bytecode. Given the public key, the address is deterministic and computable by anyone.
+
+This step exists as its own phase because the address computation is conceptually important: the smart account address appears in the DID string, is used as the expected sender in the UserOperation, and is the address that the `DIDRegistry` will record as the controller. If address prediction fails or returns an unexpected value, nothing downstream can proceed correctly.
+
+### Fetching account state
+
+`stepFetchAccountState` calls `sdk.getAccountState({ account: smartAccountAddress })` to check whether the smart account already exists on-chain. The response includes the current nonce and an `isActive` flag. The nonce is required for constructing a valid UserOperation — an operation submitted with a stale or incorrect nonce will be rejected by the EntryPoint. The `isActive` flag determines whether the UserOperation needs to include factory deployment data.
+
+If the account is already active — which can happen if a previous registration attempt partially succeeded, deploying the account but failing before the DID was registered — the pipeline can skip the factory deployment and only submit the DID registration call. This prevents a `CREATE2` collision that would cause the transaction to revert. Checking account state before preparing the UserOperation is the mechanism that makes the pipeline idempotent in this edge case.
+
+### Preparing the UserOperation
+
+`stepPrepareUserOp` is the most structurally complex step. It constructs a `UserOp` object — the ERC-4337 transaction primitive — by encoding three layers of calldata. The innermost layer is a `DIDRegistry.register` call encoding the DID hash, alias hash, and metadata CID. The middle layer is a `HyperAuthAccount.execute` call that will invoke the DIDRegistry from within the smart account. The outermost layer is the UserOperation itself, which references the smart account as `sender` and optionally includes `factory` and `factoryData` for account deployment.
+
+If the account is not yet active, `factoryData` encodes a `HyperAuthFactory.createAccount` call with the public key X and Y coordinates and a salt of zero. When the EntryPoint processes the UserOperation, it calls the factory to deploy the account before executing the calldata. The account is deployed and the DID is registered atomically within the same UserOperation execution.
+
+Gas parameters at this step use hardcoded defaults: `callGasLimit` of `0x30d40`, `verificationGasLimit` of `0xf4240`, `preVerificationGas` of `0x186a0`, and both fee fields at `0x59682f00`. These are conservative estimates that will be refined by the paymaster sponsorship in the next step. The initial values only need to be plausible enough to pass the paymaster's pre-sponsorship validation.
+
+### Sponsoring
+
+`stepSponsorUserOp` submits the unsigned UserOperation to Pimlico's paymaster service for gas sponsorship. The paymaster returns a modified UserOperation with accurate gas estimates and a paymaster signature that authorizes the EntryPoint to deduct gas fees from the paymaster's deposit rather than from the user's account.
+
+Sponsorship is why new users can register without holding ETH. The paymaster has deposited funds into the EntryPoint contract and pre-authorized itself to cover gas for UserOperations that meet its criteria. `sdk.sponsorUserOp` calls the Pimlico bundler API directly — there is no server proxy in this path. The sponsorship step is a coordination point between the user, the paymaster, and the EntryPoint — it produces a UserOperation that all three parties have implicitly agreed to.
+
+### Authorizing
+
+`stepAuthorize` is the current pipeline's authorization gate. In its present form it does nothing more than mark step seven as done and return the DID. It represents a placeholder for future access control logic — an invitation gate, a verification attestation check, or a quota enforcement — that would sit at this point in the flow before the user is permitted to commit their signature to a transaction.
+
+The position of this step matters even when it is a no-op: authorization must come after sponsorship (because you need a gas estimate before you can decide whether to approve it) and before signing (because signing constitutes the user's final consent). An authorization failure at this step means no signature has been produced, no transaction has been submitted, and the only cost incurred is the work already done in previous steps.
+
+### Signing
+
+`stepSignUserOp` computes the UserOperation hash and signs it with the signer. The `sdk.computeUserOpHash` function produces the canonical hash of the sponsored UserOperation with respect to the EntryPoint address and the chain ID — this is the same hash that the EntryPoint will verify on-chain. The hash is passed to `activeClient.sign(shares, Array.from(sdk.hexToBytes(hashToSign)))`, which calls the WASM `sign` export in the Dedicated Worker with the encrypted shares and the hash bytes.
+
+Inside the signer, the shares are reassembled into the private key scalar, the P-256 curve is used to produce a 64-byte signature (r and s as 32-byte big-endian integers, with s normalized to its low form to satisfy EVM conventions), and the signature is returned. The signed UserOperation has its `signature` field populated with the hex-encoded result.
+
+This step cannot be retried silently. If the shares are missing, corrupted, or inconsistent with the public key stored in the smart account, the resulting signature will fail validation at the EntryPoint. The signature is the cryptographic commitment that binds the user's passkey to this specific transaction at this specific nonce.
+
+### Submitting
+
+`stepSubmitUserOp` calls `sdk.sendUserOp(signedOp, entryPoint)`, which routes to Pimlico's `eth_sendUserOperation` RPC method. The bundler validates the UserOperation (checking the paymaster signature, the gas limits, the account signature, and the nonce), packages it with other UserOperations into a bundle transaction, and submits that bundle to the blockchain. The function returns the UserOperation hash — a distinct identifier from the eventual transaction hash, used to track the operation's progress through the bundler's mempool.
+
+### Waiting for confirmation
+
+`stepWaitForConfirmation` polls `sdk.waitForReceipt(userOpHash)` until the bundler confirms that the UserOperation has been included in a block. The receipt contains the transaction hash and block number of the bundle transaction. This step is the synchronization point between the ERC-4337 infrastructure and the rest of the registration pipeline — the DID is not officially registered until this receipt is obtained, because only inclusion in a block proves the `DIDRegistry.register` call executed successfully.
+
+### Saving the session
+
+`stepSaveSession` posts the normalized alias and DID to `/api/sessions` as a best-effort local record. This step is wrapped in a try/catch that swallows errors, because a failure here does not invalidate the on-chain registration. The DID exists on the chain regardless of whether any session record was stored. The session record is an optimization for fast future lookups, not a precondition for the identity's validity.
+
+## Why failures are isolated
+
+Each step function is isolated and raises errors that propagate to the pipeline's single catch block. When any step throws, the catch block marks the currently active step as errored, records the error message, and transitions the phase to `error`. The pipeline does not attempt rollback — there is nothing to roll back in most cases. A generated key pair cannot be un-generated. A deployed smart account cannot be un-deployed. An on-chain DID registration cannot be reverted except by the controller.
+
+The practical consequence is that re-registration after a failure requires understanding where the failure occurred. A failure before `stepGenerateIdentity` leaves no on-chain state and can be retried cleanly. A failure after `stepSubmitUserOp` may mean the transaction is pending in the bundler's mempool and will eventually confirm or be dropped. A failure in `stepSaveSession` means the on-chain registration succeeded and only the local session record is missing.
+
+## Gas sponsorship and the authorization gate
+
+The design of this pipeline reflects a specific set of UX values: users should not need to acquire ETH before they can create an identity, and the cost of sponsorship should be controlled by rate limiting at the application layer rather than by requiring users to pay. The authorization gate at step seven is where additional controls can be inserted without changing the fundamental structure: an invite code check, a proof-of-humanity verification, a subscription check. The position of that gate — after the key material exists but before the signature is committed — ensures that no resources are committed on the user's behalf until access has been confirmed, while also ensuring that the user's key exists and is valid before any access decision is made.
