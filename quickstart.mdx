@@ -1,81 +1,199 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
-icon: 'rocket'
+description: "Go from zero to a working passkey-authenticated React app in under ten minutes."
+icon: "rocket"
 ---
 
-## Get started in three steps
+In this tutorial you'll build a minimal React application that authenticates a user with a passkey, reads their decentralized identity, and prints it to the console. By the end you'll have a running HyperAuth integration and a clear mental model of the three pieces that make it work: the provider, the client, and the `useHyperAuth` hook.
 
-Get your documentation site running locally and make your first customization.
+## What you'll build
 
-### Step 1: Set up your local environment
+A single-page React app that:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+1. Wraps the app in `HyperAuthProvider` so every component can reach the client.
+2. Reads the client status with `useHyperAuth`.
+3. Creates a passkey and generates an identity with `client.generate()`.
+4. Logs the resulting DID and Ethereum address to the browser console.
 
-### Step 2: Deploy your changes
+## Prerequisites
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+- Node 18+ and a package manager (npm, pnpm, or bun).
+- A React project bootstrapped with Vite.
+- A browser that supports WebAuthn (Chrome, Firefox, or Safari).
+- The WASM artifacts available at `/enclave.wasm` and `/vault.wasm` in your app's `public/` directory.
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+## Steps
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+<Steps>
+  <Step title="Install the packages">
+    Open a terminal at your project root and run:
 
-### Step 3: Go live
+    ```bash
+    npm install @hyperauth/sdk @hyperauth/react
+    ```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    `@hyperauth/sdk` is the core client. `@hyperauth/react` provides the React bindings.
+  </Step>
 
-## Next steps
+  <Step title="Set up the WASM artifacts">
+    `HyperAuthProvider` spawns two browser workers when it initialises: a Dedicated Worker that loads `enclave.wasm` (the stateless signer) and a SharedWorker that loads `vault.wasm` (the stateful vault). Both binaries must be reachable by your app.
 
-Now that you have your docs running, explore these key features:
+    For local development, copy the binaries into your app's `public/` directory:
 
-<CardGroup cols={2}>
+    ```bash
+    bun run compile:wasm
+    cp core/enclave/dist/enclave.wasm apps/my-app/public/
+    cp core/vault/dist/vault.wasm apps/my-app/public/
+    ```
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+    For production, set `VITE_WASM_BASE_URL` to point at the R2 CDN and pass the URLs through to the provider:
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+    ```ts
+    const wasmBase = import.meta.env.VITE_WASM_BASE_URL;
+    const clientConfig = wasmBase
+      ? {
+          wasmUrl: `${wasmBase}/enclave.wasm`,
+          vaultWasmUrl: `${wasmBase}/vault.wasm`,
+        }
+      : undefined;
+    ```
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+    <Tip>
+      If `VITE_WASM_BASE_URL` is unset, the SDK defaults to relative paths — the local-dev path served from `public/`.
+    </Tip>
+  </Step>
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+  <Step title="Wrap your app in HyperAuthProvider">
+    Open your root file — typically `src/main.tsx` — and wrap your `<App />` in `HyperAuthProvider`:
 
-</CardGroup>
+    ```tsx src/main.tsx
+    import React from 'react';
+    import ReactDOM from 'react-dom/client';
+    import { HyperAuthProvider } from '@hyperauth/react';
+    import App from './App';
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+    ReactDOM.createRoot(document.getElementById('root')!).render(
+      <React.StrictMode>
+        <HyperAuthProvider>
+          <App />
+        </HyperAuthProvider>
+      </React.StrictMode>,
+    );
+    ```
+
+    `HyperAuthProvider` accepts an optional `config` prop. Omitting it uses the defaults, which is correct for local development when the WASM binaries are in `public/`. The provider spawns both workers in the background; your app continues rendering immediately.
+  </Step>
+
+  <Step title="Read the client with useHyperAuth">
+    Create `src/App.tsx` with the following content:
+
+    ```tsx src/App.tsx
+    import { useHyperAuth } from '@hyperauth/react';
+
+    export default function App() {
+      const { client, status } = useHyperAuth();
+
+      if (status === 'initializing') {
+        return <p>Loading HyperAuth...</p>;
+      }
+
+      if (status === 'error') {
+        return <p>HyperAuth failed to initialise. Check the console.</p>;
+      }
+
+      return (
+        <div>
+          <p>HyperAuth is ready.</p>
+          <CreatePasskeyButton client={client!} />
+        </div>
+      );
+    }
+    ```
+
+    `useHyperAuth` returns three values you'll use constantly:
+
+    | Value | Type | Meaning |
+    |---|---|---|
+    | `client` | `HyperAuthClient \| null` | The initialised client, or `null` while loading |
+    | `status` | `'initializing' \| 'ready' \| 'error'` | Current provider state |
+    | `isReady` | `boolean` | `true` when `status === 'ready'` and `client !== null` |
+  </Step>
+
+  <Step title="Create a passkey and generate an identity">
+    Add the `CreatePasskeyButton` component to the same file, below `App`:
+
+    ```tsx src/App.tsx
+    import { useState } from 'react';
+    import { createPasskey } from '@hyperauth/sdk';
+    import type { HyperAuthClient } from '@hyperauth/sdk';
+
+    function CreatePasskeyButton({ client }: { client: HyperAuthClient }) {
+      const [busy, setBusy] = useState(false);
+
+      async function handleCreate() {
+        setBusy(true);
+        try {
+          const { credential } = await createPasskey('demo-user');
+
+          const result = await client.generate(credential, {
+            identifier: 'demo-user',
+          });
+
+          console.log('DID:', result.did);
+          console.log('Ethereum address:', result.address);
+          console.log('Full result:', result);
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      return (
+        <button onClick={handleCreate} disabled={busy}>
+          {busy ? 'Creating...' : 'Create passkey'}
+        </button>
+      );
+    }
+    ```
+
+    `client.generate()` returns a `GenerateResult`:
+
+    ```ts
+    interface GenerateResult {
+      success: boolean;
+      did: string;          // e.g. "did:key:z6Mk..."
+      address: string;      // Ethereum address derived from the public key
+      shares: EncryptedShares & { enclave_id: string };
+      parsed_credential: Record<string, unknown>;
+    }
+    ```
+
+    <Note>
+      Keep `result.shares` — it is the encrypted key material you'll pass to `client.sign()` in later operations.
+    </Note>
+  </Step>
+
+  <Step title="Run the app and see your identity">
+    Start the dev server:
+
+    ```bash
+    npm run dev
+    ```
+
+    Open `http://localhost:5173`, click **Create passkey**, and follow the browser's WebAuthn prompt. You'll see two lines appear in the browser console:
+
+    ```
+    DID: did:key:z6Mk...
+    Ethereum address: 0x...
+    ```
+
+    <Check>
+      No server round-trip is needed to generate the identity. The DID and address are derived entirely inside the signer Dedicated Worker running in your browser.
+    </Check>
+  </Step>
+</Steps>
+
+## What you have built
+
+You now have a working HyperAuth integration with passkey authentication. `HyperAuthProvider` manages both worker lifecycles: a Dedicated Worker per tab for stateless signing (`enclave.wasm`) and a SharedWorker per origin for stateful vault storage (`vault.wasm`). `useHyperAuth` gives any component access to the client, and `client.generate()` ties a passkey credential to a self-sovereign identity.
+
+The `shares` value returned by `generate()` is the key you'll carry into signing and registration. The next tutorial, [Build a Registration Flow](/tutorials/register-identity), shows how to use it to publish your identity on-chain.

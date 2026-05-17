@@ -1,133 +1,94 @@
 ---
 title: "Introduction"
-description: "Welcome to the new home for your documentation"
-icon: 'star'
+description: "A decentralized identity platform using passkey-secured WASM enclaves. No passwords. No custody. No compromise."
+icon: "circle-info"
 ---
 
-## Setting up
+HyperAuth is a decentralized identity platform built on a single core principle: crypto logic belongs close to the data. All cryptographic operations run inside SQLite custom functions within a Go WASM plugin, deployed as a Cloudflare Worker. Your application gets a thin TypeScript SDK on top — no servers to manage, no keys to custody.
 
-Get your documentation site up and running in minutes.
+Identity in HyperAuth is self-sovereign. Users register with a passkey, receive a decentralized identifier (DID), and can attach smart accounts, delegate capabilities, and sync across devices — all without passwords or centralized auth servers.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+## Capabilities
 
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Passkey authentication" icon="fingerprint">
+    WebAuthn-based registration and sign-in. No passwords, no shared secrets.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Decentralized identifiers" icon="id-card">
+    W3C DIDs anchored to the user's passkey keypair.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="ERC-4337 smart accounts" icon="wallet">
+    Gasless on-chain accounts linked to the user's DID.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="UCAN authorization" icon="key">
+    Capability-based delegation without a central authority.
   </Card>
-</Columns>
+  <Card title="Device sync" icon="arrows-rotate">
+    Deterministic key derivation enables seamless multi-device identity.
+  </Card>
+  <Card title="Encrypted vault" icon="lock">
+    Client-side encrypted storage, decryptable only by the identity holder.
+  </Card>
+</CardGroup>
 
-## Create beautiful pages
+## Install
 
-Everything you need to create world-class documentation.
+```sh
+npm install @hyperauth/sdk @hyperauth/react
+```
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+Three packages are available depending on what your application needs:
 
-## Make your content agent ready
+| Package | Purpose |
+|---|---|
+| `@hyperauth/sdk` | Core client SDK — crypto, vault, registration, ERC-4337 |
+| `@hyperauth/react` | React 19 hooks and provider |
+| `@hyperauth/ui` | Shared component library (shadcn/ui) |
 
-Make your docs work for humans and AI agents alike.
+## Where to start
 
-<Columns cols={2}>
-  <Card
-    title="Prompt component"
-    icon="robot"
-    href="/agent-ready/prompt"
-  >
-    Embed shareable AI prompts readers can copy or open in Cursor.
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Add passkey sign-in to an existing app in minutes.
   </Card>
-  <Card
-    title="Visibility"
-    icon="eye"
-    href="/agent-ready/visibility"
-  >
-    Show different content to humans and agents reading your docs.
+  <Card title="Register an identity" icon="user-plus" href="/tutorials/register-identity">
+    Walk through the full 12-phase registration flow.
   </Card>
-  <Card
-    title="Contextual menu"
-    icon="bolt"
-    href="/agent-ready/contextual"
-  >
-    Give readers one-click access to Claude, ChatGPT, Cursor, and more.
+  <Card title="Sign and verify" icon="signature" href="/tutorials/sign-and-verify">
+    Produce and verify a UCAN-signed payload.
   </Card>
-  <Card
-    title="AI coding tools"
-    icon="wand-magic-sparkles"
-    href="/ai-tools/claude-code"
-  >
-    Set up Claude Code, Cursor, or Windsurf with Mintlify's skill.
+  <Card title="Architecture" icon="diagram-project" href="/concepts/architecture">
+    Why HyperAuth is built the way it is.
   </Card>
-</Columns>
+</CardGroup>
 
-## Need inspiration?
+## SDK guides
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+Task-oriented instructions for common integration scenarios.
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="fingerprint" href="/guides/authentication">
+    Handle sign-in, session management, and device re-auth.
+  </Card>
+  <Card title="Smart accounts" icon="wallet" href="/guides/smart-accounts">
+    Create and use ERC-4337 accounts from a DID.
+  </Card>
+  <Card title="UCAN delegation" icon="key" href="/guides/ucan-delegation">
+    Issue and validate capability tokens.
+  </Card>
+  <Card title="Vault management" icon="vault" href="/guides/vault-management">
+    Read, write, and rotate encrypted vault entries.
+  </Card>
+  <Card title="Device sync" icon="arrows-rotate" href="/guides/device-sync">
+    Link a new device to an existing identity.
+  </Card>
+  <Card title="Payments" icon="credit-card" href="/guides/payments">
+    Send gasless transactions via the smart account.
+  </Card>
+  <Card title="Alias lookup" icon="magnifying-glass" href="/guides/alias-lookup">
+    Resolve human-readable aliases to DIDs.
+  </Card>
+  <Card title="Deploy" icon="cloud-arrow-up" href="/guides/deploy">
+    Deploy the HyperAuth Worker to your own Cloudflare account.
+  </Card>
+</CardGroup>
