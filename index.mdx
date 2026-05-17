@@ -1,12 +1,12 @@
 ---
 title: "Introduction"
-description: "A decentralized identity platform using passkey-secured WASM enclaves. No passwords. No custody. No compromise."
+description: "Open source passkey identity for modern apps. Self-host the worker, audit every line, ship without password infrastructure."
 icon: "circle-info"
 ---
 
-HyperAuth is a decentralized identity platform built on a single core principle: crypto logic belongs close to the data. All cryptographic operations run inside SQLite custom functions within a Go WASM plugin, deployed as a Cloudflare Worker. Your application gets a thin TypeScript SDK on top — no servers to manage, no keys to custody.
+HyperAuth is an open source identity platform built on a single core principle: crypto logic belongs close to the data. Every cryptographic operation runs inside SQLite custom functions within a Go WASM plugin, deployed as a Cloudflare Worker that you can run on your own account. Your application gets a thin TypeScript SDK on top — no servers to manage, no keys to custody, no vendor lock-in.
 
-Identity in HyperAuth is self-sovereign. Users register with a passkey, receive a decentralized identifier (DID), and can attach smart accounts, delegate capabilities, and sync across devices — all without passwords or centralized auth servers.
+Users sign in with a passkey, receive a portable identifier they fully own, and can attach smart accounts, delegate capabilities, and sync across devices — all without passwords, password resets, or a third party holding their session. Every package, every contract, every WASM module is open source under permissive licenses.
 
 ## Capabilities
 
@@ -14,20 +14,34 @@ Identity in HyperAuth is self-sovereign. Users register with a passkey, receive 
   <Card title="Passkey authentication" icon="fingerprint">
     WebAuthn-based registration and sign-in. No passwords, no shared secrets.
   </Card>
-  <Card title="Decentralized identifiers" icon="id-card">
-    W3C DIDs anchored to the user's passkey keypair.
+  <Card title="Portable identifiers (DIDs)" icon="id-card">
+    W3C-compliant identifiers anchored to the user's passkey keypair.
   </Card>
   <Card title="ERC-4337 smart accounts" icon="wallet">
     Gasless on-chain accounts linked to the user's DID.
   </Card>
   <Card title="UCAN authorization" icon="key">
-    Capability-based delegation without a central authority.
+    Capability-based delegation without a permission server.
   </Card>
   <Card title="Device sync" icon="arrows-rotate">
     Deterministic key derivation enables seamless multi-device identity.
   </Card>
   <Card title="Encrypted vault" icon="lock">
     Client-side encrypted storage, decryptable only by the identity holder.
+  </Card>
+</CardGroup>
+
+## Why HyperAuth
+
+<CardGroup cols={3}>
+  <Card title="Open source" icon="code-branch">
+    Every layer — SDK, hooks, smart contracts, WASM enclave, vault worker — is open source and auditable.
+  </Card>
+  <Card title="Self-hostable" icon="server">
+    Deploy the worker on your own Cloudflare account. No SaaS dependency, no per-MAU billing.
+  </Card>
+  <Card title="No custody" icon="shield-halved">
+    Keys never leave the user's device. We can't lose or leak what we never hold.
   </Card>
 </CardGroup>
 
