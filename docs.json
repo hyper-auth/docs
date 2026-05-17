@@ -1,20 +1,21 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mintlify Starter Kit",
+  "name": "HyperAuth",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#0A0A0A",
+    "light": "#FAFAFA",
+    "dark": "#0A0A0A"
   },
   "favicon": "/favicon.svg",
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Get Started",
+        "icon": "rocket",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Introduction",
             "pages": [
               "index",
               "quickstart",
@@ -22,51 +23,122 @@
             ]
           },
           {
-            "group": "Customization",
+            "group": "Tutorials",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
-            ]
-          },
-          {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/components",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "Agent ready",
-            "pages": [
-              "agent-ready/prompt",
-              "agent-ready/visibility",
-              "agent-ready/contextual",
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "tutorials/register-identity",
+              "tutorials/sign-and-verify"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "SDK",
+        "icon": "code",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Guides",
+            "pages": [
+              "guides/authentication",
+              "guides/smart-accounts",
+              "guides/ucan-delegation",
+              "guides/vault-management",
+              "guides/device-sync",
+              "guides/payments",
+              "guides/alias-lookup",
+              "guides/deploy"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "sdk-reference/sdk-client",
+              "sdk-reference/react-hooks",
+              "sdk-reference/ui-components",
+              "sdk-reference/contracts",
+              "sdk-reference/types",
+              "sdk-reference/configuration"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/did-model",
+              "concepts/registration-flow",
+              "concepts/smart-account-abstraction",
+              "concepts/security-model"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "icon": "server",
+        "groups": [
+          {
+            "group": "Overview",
             "pages": [
               "api-reference/introduction"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Static / CDN",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api-reference/static/enclave-wasm"
+            ]
+          },
+          {
+            "group": "Stateless",
+            "pages": [
+              "api-reference/stateless/contracts",
+              "api-reference/stateless/bundler",
+              "api-reference/stateless/status",
+              "api-reference/stateless/accounts-predict",
+              "api-reference/stateless/accounts-state",
+              "api-reference/stateless/balance",
+              "api-reference/stateless/sessions-status"
+            ]
+          },
+          {
+            "group": "Global Lookups",
+            "pages": [
+              "api-reference/lookups/dids-lookup",
+              "api-reference/lookups/aliases-check"
+            ]
+          },
+          {
+            "group": "Registration",
+            "pages": [
+              "api-reference/registration/sessions",
+              "api-reference/registration/sessions-check",
+              "api-reference/registration/verify-send",
+              "api-reference/registration/verify-check",
+              "api-reference/registration/verify-status",
+              "api-reference/registration/dids"
+            ]
+          },
+          {
+            "group": "Indexer",
+            "pages": [
+              "api-reference/indexer/proxy"
+            ]
+          },
+          {
+            "group": "Payments",
+            "pages": [
+              "api-reference/payments/handler"
+            ]
+          },
+          {
+            "group": "Inngest",
+            "pages": [
+              "api-reference/inngest/webhook"
+            ]
+          },
+          {
+            "group": "Rate Limits",
+            "pages": [
+              "api-reference/rate-limits"
             ]
           }
         ]
@@ -75,14 +147,9 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
+          "anchor": "GitHub",
+          "href": "https://github.com/hyper-auth",
+          "icon": "github"
         }
       ]
     }
@@ -94,33 +161,31 @@
   "navbar": {
     "links": [
       {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
+        "label": "GitHub",
+        "href": "https://github.com/hyper-auth"
       }
     ],
     "primary": {
       "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
+      "label": "Get Started",
+      "href": "/quickstart"
     }
   },
   "contextual": {
     "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
+      "copy",
+      "view",
+      "chatgpt",
+      "claude",
+      "perplexity",
+      "mcp",
+      "cursor",
+      "vscode"
+    ]
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/hyper-auth"
     }
   }
 }
