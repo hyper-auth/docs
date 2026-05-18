@@ -1,12 +1,12 @@
 ---
 title: "Next.js App Router"
-description: "Mount HyperAuthProvider, emit the SDK's required CSP, and configure env vars in a Next.js App Router project."
+description: "Wire HyperAuthProvider into a Next.js App Router app: mount it on the client, emit the SDK's required CSP, and set runtime env vars."
 icon: "react"
 ---
 
 This guide shows you how to wire `@hyperauth/react` into a Next.js App Router project. By the end, your app will mount `HyperAuthProvider` on the client, emit the Content Security Policy directives the SDK needs to boot, and read its runtime configuration from environment variables.
 
-Use this guide if your app is built with Next.js 14 or later and uses the App Router. If you're on Vite or another bundler, the [Quickstart](/quickstart) covers the simpler setup path.
+Use this guide if you build with Next.js 14 or later on the App Router. If you use Vite or another bundler, the [Quickstart](/quickstart) covers the simpler setup path.
 
 ## Prerequisites
 
@@ -86,7 +86,7 @@ Components inside the tree can now call `useHyperAuth` and the other hooks from 
 
 ## Emit the required CSP
 
-The SDK needs a specific set of Content Security Policy directives to boot — without them, workers fail to start, OPFS writes are blocked, or the bundler ALPN handshake silently drops. Use Next.js middleware (named `proxy.ts` in Next 16+, `middleware.ts` in earlier versions) to attach the header:
+The SDK needs a specific set of Content Security Policy directives to boot. Without them, workers fail to start, OPFS writes are blocked, or the bundler ALPN handshake silently drops. Use Next.js middleware (named `proxy.ts` in Next 16+, `middleware.ts` in earlier versions) to attach the header:
 
 ```ts proxy.ts
 import { NextResponse, type NextRequest } from "next/server";
@@ -177,7 +177,7 @@ test("dashboard boots without HyperAuth errors", async ({ page }) => {
 });
 ```
 
-Run it against a production build (`next build && next start`) so CSP is enforced and the same code paths exercise as in deployment.
+Run it against a production build (`next build && next start`) so the middleware enforces CSP and the test exercises the same code paths as a real deployment.
 
 ## Next steps
 
