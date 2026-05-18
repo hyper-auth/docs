@@ -142,6 +142,18 @@
             ]
           }
         ]
+      },
+      {
+        "tab": "Changelog",
+        "icon": "rss",
+        "groups": [
+          {
+            "group": "Changelog",
+            "pages": [
+              "changelog/overview"
+            ]
+          }
+        ]
       }
     ],
     "global": {

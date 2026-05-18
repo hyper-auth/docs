@@ -1,0 +1,29 @@
+---
+title: "Changelog"
+description: "Product updates and improvements across the HyperAuth platform."
+icon: "rss"
+---
+
+<Update label="May 18, 2026" tags={["sdk", "backend", "contracts", "dashboard"]}>
+
+## New features
+
+**Email-code authentication flow.** A new passwordless sign-in path that sends a one-time code over email and mints a session SBT once verified. Available in the SDK widget today; drop it into any app alongside passkey sign-in. See [Authentication](/guides/authentication).
+
+**`@hyperauth/widget` package.** An embeddable, zero-config auth widget — inline, overlay, or full-page — with built-in flows for passkey and email-code sign-in. Style it with your host CSS or use the bundled theme. See [UI components](/sdk-reference/ui-components).
+
+**Vue bindings.** First-class Vue 3 support via `@hyperauth/vue`, mirroring the React hook surface (`useLogin`, `useSession`, `useAccount`, `useRegistration`, and more). See [SDK reference](/sdk-reference/sdk-client).
+
+**Email-verify orchestrator (backend).** A new Inngest-powered backend service handles email code delivery, expiry sweeps, session minting, and revocation end-to-end. Self-hosters get a deployable orchestrator image; SDK users get a faster, more reliable email flow. See [Deploy](/guides/deploy).
+
+## Updates
+
+**HyperAuth provider in the dashboard.** The HyperAuth admin dashboard now boots the SDK at the app root, with the required Content Security Policy directives emitted automatically in production. New `NEXT_PUBLIC_HYPERAUTH_*` environment variables let self-hosters point the dashboard at their own enclave, vault, and chain. See [Configuration](/sdk-reference/configuration).
+
+**Pimlico bundler error mapping.** Userop submission now surfaces structured errors from the Pimlico bundler instead of raw RPC payloads, so failed transactions are easier to diagnose. See [Bundler API](/api-reference/stateless/bundler).
+
+## Bug fixes
+
+**Smart account safety check.** `AccountHelper` now rejects a zero address in its constructor, preventing accidental deployment against an unset entrypoint. See [Contracts reference](/sdk-reference/contracts).
+
+</Update>
