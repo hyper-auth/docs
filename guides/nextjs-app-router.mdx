@@ -1,0 +1,186 @@
+---
+title: "Next.js App Router"
+description: "Mount HyperAuthProvider, emit the SDK's required CSP, and configure env vars in a Next.js App Router project."
+icon: "react"
+---
+
+This guide shows you how to wire `@hyperauth/react` into a Next.js App Router project. By the end, your app will mount `HyperAuthProvider` on the client, emit the Content Security Policy directives the SDK needs to boot, and read its runtime configuration from environment variables.
+
+Use this guide if your app is built with Next.js 14 or later and uses the App Router. If you're on Vite or another bundler, the [Quickstart](/quickstart) covers the simpler setup path.
+
+## Prerequisites
+
+- A Next.js 14+ project using the App Router.
+- Node.js 18 or higher and a package manager (npm, pnpm, or bun).
+- A browser that supports WebAuthn (Chrome, Firefox, or Safari).
+
+## Install the packages
+
+`@hyperauth/react` declares `viem` as a peer dependency. Install all three together:
+
+```bash
+npm install @hyperauth/client @hyperauth/react viem
+```
+
+<Note>
+  Make sure your lockfile resolves a single copy of `react`. If you ship a workspace with multiple apps, dedupe React at the root — the provider relies on `useSyncExternalStore`, which throws if it sees two React instances.
+</Note>
+
+## Wrap the provider for the client boundary
+
+`HyperAuthProvider` spawns browser workers and reads `useSyncExternalStore` at module-eval time. Both require the client runtime, so import it through `next/dynamic` with `ssr: false`:
+
+```tsx app/_providers/hyperauth-provider.tsx
+"use client";
+
+import dynamic from "next/dynamic";
+import type { ClientConfig } from "@hyperauth/client";
+import type { ReactNode } from "react";
+
+const config: ClientConfig = {
+  // Falls back to https://cdn.hyperauth.dev/latest/{enclave,vault}.wasm
+  // when the env vars are undefined.
+  wasmUrl: process.env.NEXT_PUBLIC_HYPERAUTH_ENCLAVE_WASM_URL,
+  vaultWasmUrl: process.env.NEXT_PUBLIC_HYPERAUTH_VAULT_WASM_URL,
+};
+
+const HyperAuthProviderClient = dynamic(
+  () => import("@hyperauth/react").then((m) => ({ default: m.HyperAuthProvider })),
+  { ssr: false },
+);
+
+export function DashboardHyperAuthProvider({ children }: { children: ReactNode }) {
+  return (
+    <HyperAuthProviderClient
+      projectId={process.env.NEXT_PUBLIC_HYPERAUTH_PROJECT_ID}
+      chain={(process.env.NEXT_PUBLIC_HYPERAUTH_CHAIN ?? "base") as "base"}
+      config={config}
+    >
+      {children}
+    </HyperAuthProviderClient>
+  );
+}
+```
+
+<Warning>
+  Don't import `@hyperauth/react` directly into `app/layout.tsx`. The package's production bundle uses `react/jsx-runtime`, and Next.js will try to resolve the SSR path of the provider at build time. Routing the import through `next/dynamic({ ssr: false })` keeps the SDK off the server entirely.
+</Warning>
+
+Then mount the wrapper in the root layout:
+
+```tsx app/layout.tsx
+import { DashboardHyperAuthProvider } from "./_providers/hyperauth-provider";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <DashboardHyperAuthProvider>{children}</DashboardHyperAuthProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+Components inside the tree can now call `useHyperAuth` and the other hooks from `@hyperauth/react`. See the [React Hooks Reference](/sdk-reference/react-hooks) for the full surface.
+
+## Emit the required CSP
+
+The SDK needs a specific set of Content Security Policy directives to boot — without them, workers fail to start, OPFS writes are blocked, or the bundler ALPN handshake silently drops. Use Next.js middleware (named `proxy.ts` in Next 16+, `middleware.ts` in earlier versions) to attach the header:
+
+```ts proxy.ts
+import { NextResponse, type NextRequest } from "next/server";
+import { cspManifestString } from "@hyperauth/react";
+
+// Next.js Server Components, next-themes, and framer-motion inject inline
+// <style> tags. The SDK manifest does not include style-src, so we add it
+// here. 'unsafe-inline' is the standard App Router workaround.
+const APP_CSP = "style-src 'self' 'unsafe-inline'";
+
+const CSP = `default-src 'self'; ${cspManifestString()}; ${APP_CSP}`;
+
+// Next.js dev injects inline scripts (Turbopack HMR + RSC hydration markers)
+// that would violate script-src 'self' 'wasm-unsafe-eval'. Those scripts
+// don't exist in production builds, so we only enforce CSP in production.
+const ENFORCE_CSP = process.env.NODE_ENV === "production";
+
+export function proxy(_request: NextRequest) {
+  const response = NextResponse.next();
+  if (ENFORCE_CSP) {
+    response.headers.set("Content-Security-Policy", CSP);
+  }
+  return response;
+}
+
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+};
+```
+
+<Tip>
+  If `@hyperauth/react`'s exports map can't be resolved from the edge runtime in your setup, inline the directive string verbatim by running `bun --print "import('@hyperauth/react').then(m => console.log(m.cspManifestString()))"` and pasting the output. Re-run after each SDK upgrade.
+</Tip>
+
+### Why CSP is gated to production
+
+Next.js dev injects inline scripts for HMR and RSC hydration markers that would violate `script-src 'self' 'wasm-unsafe-eval'`. Those scripts don't exist in production builds, so the default gate is `NODE_ENV === "production"`. A nonce-based strategy is required to enforce CSP in dev too — out of scope for this guide.
+
+## Configure runtime env vars
+
+Document the SDK's runtime configuration in `.env.example` so contributors know what to set:
+
+```sh .env.example
+# WASM URLs. Unset → falls back to:
+#   https://cdn.hyperauth.dev/latest/enclave.wasm
+#   https://cdn.hyperauth.dev/latest/vault.wasm
+# Pin to a specific version for production deployments.
+NEXT_PUBLIC_HYPERAUTH_ENCLAVE_WASM_URL=
+NEXT_PUBLIC_HYPERAUTH_VAULT_WASM_URL=
+
+# UCAN policy token issued by HyperAuth for this app. Unset is fine in
+# dev — the SDK will boot but RPC calls will return 401.
+NEXT_PUBLIC_HYPERAUTH_PROJECT_ID=
+
+# Default chain for embedded wallets. Default: base.
+NEXT_PUBLIC_HYPERAUTH_CHAIN=base
+```
+
+| Variable | Required | Description |
+|---|---|---|
+| `NEXT_PUBLIC_HYPERAUTH_ENCLAVE_WASM_URL` | No | Override the enclave WASM URL. Defaults to the public CDN. |
+| `NEXT_PUBLIC_HYPERAUTH_VAULT_WASM_URL` | No | Override the vault WASM URL. Defaults to the public CDN. |
+| `NEXT_PUBLIC_HYPERAUTH_PROJECT_ID` | In production | UCAN policy token bound to your app. Without it, authenticated RPC calls return `401`. |
+| `NEXT_PUBLIC_HYPERAUTH_CHAIN` | No | Default chain for embedded wallets. One of `base`, `base-sepolia`, `monad`, `ethereum`. Defaults to `base`. |
+
+<Note>
+  The `NEXT_PUBLIC_` prefix is required so the values reach the browser bundle — the provider runs on the client.
+</Note>
+
+## Verify the boot
+
+A quick way to confirm the provider booted is a smoke test that fails on any SDK-related console error:
+
+```ts e2e/hyperauth-boot.spec.ts
+import { test, expect } from "@playwright/test";
+
+test("dashboard boots without HyperAuth errors", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (msg) => {
+    if (msg.type() === "error") errors.push(msg.text());
+  });
+  page.on("pageerror", (err) => errors.push(err.message));
+
+  await page.goto("/");
+  await expect(page.locator("body")).toBeVisible();
+
+  expect(errors.filter((e) => /hyperauth|wasm|worker/i.test(e))).toEqual([]);
+});
+```
+
+Run it against a production build (`next build && next start`) so CSP is enforced and the same code paths exercise as in deployment.
+
+## Next steps
+
+- [React Hooks Reference](/sdk-reference/react-hooks) — full surface of hooks the provider exposes.
+- [Configuration Reference](/sdk-reference/configuration) — every field on `ClientConfig`.
+- [Deploy](/guides/deploy) — host the vault worker and pin the WASM artifacts behind your own CDN.

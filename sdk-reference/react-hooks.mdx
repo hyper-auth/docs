@@ -19,22 +19,40 @@ Context provider that initializes `HyperAuthClient` and makes it available to th
 
 ```ts
 interface HyperAuthProviderProps {
+  projectId?: string;
+  chain?: SupportedChain;
   config?: ClientConfig;
+  enclaveOrigin?: string;
+  maxRestartAttempts?: number;
+  autoRestart?: boolean;
   children: React.ReactNode;
 }
+
+type SupportedChain = 'base' | 'base-sepolia' | 'monad' | 'ethereum';
 ```
 
-| Prop | Type | Description |
-|---|---|---|
-| `config` | `ClientConfig` | Passed directly to `createClient`. All fields are optional; see [SDK Client Reference](/sdk-reference/sdk-client#clientconfig). |
-| `children` | `React.ReactNode` | Component subtree |
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `projectId` | `string` | — | UCAN policy token issued by HyperAuth for your app. Required in production; the provider boots without it but RPC calls will return `401`. |
+| `chain` | `SupportedChain` | `'base'` | Default chain for embedded wallets. The provider forwards the matching contract addresses to the signer worker and re-syncs the store when the prop changes. |
+| `config` | `ClientConfig` | — | Override the underlying SDK client config. `projectId` and `chain` still take precedence. See [Configuration Reference](/sdk-reference/configuration#clientconfig). |
+| `enclaveOrigin` | `string` | — | If set and not equal to `window.location.origin`, the enclave is hosted inside a hidden iframe at this origin. This is the COOP/COEP-free deployment path. |
+| `maxRestartAttempts` | `number` | `3` | Maximum silent restart attempts after a worker crash. |
+| `autoRestart` | `boolean` | `true` | Disable auto-restart entirely. Useful in tests. |
+| `children` | `React.ReactNode` | — | Component subtree. |
 
 ### Behavior
 
 - Calls `createClient(config)` once on mount inside a `useEffect`.
 - Sets `status` to `'initializing'` during setup, `'ready'` on success, `'error'` on failure.
+- Parses `projectId` as a UCAN policy and exposes it as `policy` on the context.
+- Reacts to `chain` prop changes without restarting the worker.
 - Calls `client.close()` on unmount.
 - Uses a `useRef` guard to prevent double-initialization in React Strict Mode.
+
+<Note>
+  The provider spawns browser workers at mount, so it must render on the client. In server-rendered frameworks such as Next.js App Router, import it through `next/dynamic` with `ssr: false`. See [Next.js App Router](/guides/nextjs-app-router) for a full example.
+</Note>
 
 ---
 
@@ -60,6 +78,13 @@ interface HyperAuthContextValue {
   status: HyperAuthStatus;
   error: Error | null;
   isReady: boolean;
+  user: User | null;
+  address: `0x${string}` | null;
+  authStatus: AuthStatus;
+  session: SessionKey | null;
+  provider: ProviderKind;
+  policy: UcanPolicy | null;
+  chain: SupportedChain;
 }
 ```
 
@@ -69,6 +94,13 @@ interface HyperAuthContextValue {
 | `status` | `HyperAuthStatus` | Current initialization state |
 | `error` | `Error \| null` | Error object if `status === 'error'`, otherwise `null` |
 | `isReady` | `boolean` | `true` when `status === 'ready'` and `client !== null` |
+| `user` | `User \| null` | Authenticated user, if any. |
+| `address` | `` `0x${string}` \| null `` | Smart account address (counterfactual; available before deployment). |
+| `authStatus` | `AuthStatus` | Auth status independent of the worker lifecycle. |
+| `session` | `SessionKey \| null` | Active session key, if one has been delegated. |
+| `provider` | `ProviderKind` | Provider that produced the current authenticated state (e.g. `'passkey'`). |
+| `policy` | `UcanPolicy \| null` | Project policy parsed from the `projectId` prop. |
+| `chain` | `SupportedChain` | Currently configured chain. |
 
 ### `HyperAuthStatus`
 
@@ -255,3 +287,62 @@ interface RegistrationOutcome {
 | `txHash` | `string` | Transaction hash of the confirmed UserOperation |
 | `blockNumber` | `number \| null` | Block number of confirmation; `null` if not parseable |
 | `smartAccount` | `string` | Deployed smart account address |
+
+---
+
+## `cspManifest`
+
+```ts
+import { cspManifest } from '@hyperauth/react'
+```
+
+Object describing the Content Security Policy directives the SDK requires to boot. Merge these into your app's CSP — otherwise the workers fail to start, OPFS writes are blocked, or the bundler ALPN handshake silently drops.
+
+### Shape
+
+```ts
+const cspManifest = {
+  'worker-src': ["'self'", 'blob:'],
+  'script-src': ["'self'", "'wasm-unsafe-eval'"],
+  'connect-src': [
+    "'self'",
+    'https://*.hyperauth.io',
+    'https://*.hyperauth.dev',
+    'https://*.pimlico.io',
+    'wss://*.hyperauth.io',
+    'https://api.transak.com',
+    'https://api.sardine.ai',
+  ],
+  'frame-src': ["'self'", 'https://*.hyperauth.io'],
+  'img-src': ["'self'", 'data:', 'blob:'],
+} as const;
+```
+
+---
+
+## `cspManifestString`
+
+```ts
+import { cspManifestString } from '@hyperauth/react'
+```
+
+Returns `cspManifest` serialized as a single CSP header value. Use this when your CSP is composed at request time, for example from a Next.js proxy or middleware.
+
+### Signature
+
+```ts
+function cspManifestString(): string
+```
+
+### Example
+
+```ts
+import { cspManifestString } from '@hyperauth/react';
+
+const csp = `default-src 'self'; ${cspManifestString()}; style-src 'self' 'unsafe-inline'`;
+response.headers.set('Content-Security-Policy', csp);
+```
+
+<Note>
+  `cspManifest` does not include `style-src`. Next.js Server Components, `next-themes`, and `framer-motion` inject inline `<style>` tags; the standard workaround is to add `style-src 'self' 'unsafe-inline'` alongside the SDK directives.
+</Note>

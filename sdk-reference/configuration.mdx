@@ -14,6 +14,7 @@ Passed to `createClient(config)` or `HyperAuthClient.create(plugin, config)`. Al
 ```typescript
 interface ClientConfig {
   wasmUrl?: string;
+  vaultWasmUrl?: string;
   wasmBytes?: Uint8Array;
   logger?: Pick<Console, 'log' | 'error' | 'warn' | 'info' | 'debug'>;
   debug?: boolean;
@@ -26,7 +27,8 @@ interface ClientConfig {
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `wasmUrl` | `string` | `"/enclave.wasm"` | URL from which the WASM enclave binary is fetched. Used by `createClient()` when initializing the core worker. |
+| `wasmUrl` | `string` | `https://cdn.hyperauth.dev/latest/enclave.wasm` | URL of the stateless signer WASM, loaded by the Dedicated Worker. Pin to a versioned R2 URL in production builds. |
+| `vaultWasmUrl` | `string` | `https://cdn.hyperauth.dev/latest/vault.wasm` | URL of the stateful vault WASM, loaded by the SharedWorker. Pin to a versioned URL in production. |
 | `wasmBytes` | `Uint8Array` | — | Raw WASM bytes. Alternative to `wasmUrl` for environments where fetching is unavailable. |
 | `logger` | `Pick<Console, 'log' \| 'error' \| 'warn' \| 'info' \| 'debug'>` | `console` | Logger instance. All log calls are gated by `debug`. |
 | `debug` | `boolean` | `false` | Enable debug logging. When `false`, no messages are emitted through the logger. |
@@ -36,6 +38,7 @@ interface ClientConfig {
 ### Notes
 
 - `wasmUrl` and `wasmBytes` are mutually exclusive. `wasmBytes` takes precedence in the bridge implementation if both are supplied.
+- `wasmUrl` and `vaultWasmUrl` both default to the public CDN at `https://cdn.hyperauth.dev/latest/`. For production deployments, pin to a specific version (e.g. `https://cdn.hyperauth.dev/v0.5.2/enclave.wasm`) so a CDN rollout cannot break a live build.
 - `autoLockTimeout` triggers `HyperAuthClient.lock()` after the inactivity period. If an `onAutoLock` callback has been registered via `setAutoLockCallback()`, it receives the encrypted `database` bytes from the lock result.
 - `createClient()` uses `wasmUrl` and `contracts` to initialize the core worker bridge. `HyperAuthClient.create()` with a pre-constructed `WasmPlugin` does not use these fields.
 
