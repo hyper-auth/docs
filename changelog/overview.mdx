@@ -20,6 +20,8 @@ icon: "newspaper"
 
 **Dashboard data boundary in place.** The dashboard now consumes data through a single `lib/api` seam that delegates to the orchestrator's `/v1/console/*` admin API as each endpoint comes online. Pages continue to render against the existing mock store until the matching real endpoint ships, so per-resource cutover is incremental and non-breaking.
 
+**Console admin API: orgs, members, and apps are live.** The first batch of `/v1/console/*` endpoints is shipping. List, read, create, update, and delete are now available for organizations, members, and apps, with the dashboard cutting over per resource. Every admin call is gated by a UCAN capability (for example `console.org.write`, `console.app.delete`), and every write emits an audit event atomically with the change, so the audit log is always consistent with what actually happened. See [UCAN delegation](/guides/ucan-delegation).
+
 **TanStack Query mounted across the dashboard.** All dashboard pages now sit under a `QueryClientProvider`, enabling cached, refetchable data as the console API rolls out.
 
 **Dashboard environment variables.** Two new flags wire the dashboard to the orchestrator. `NEXT_PUBLIC_HYPERAUTH_API_URL` points at the admin API base and is required once real fetches are enabled. `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE` opts the dashboard into the SSE event tail. Both are documented in `apps/dashboard/.env.example`.
