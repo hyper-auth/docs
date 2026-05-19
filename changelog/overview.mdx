@@ -4,7 +4,23 @@ description: "Weekly release notes for HyperAuth, covering new features, updates
 icon: "newspaper"
 ---
 
-<Update label="May 19, 2026" tags={["dashboard", "sdk", "orchestrator", "contracts"]}>
+<Update label="May 19, 2026" tags={["orchestrator", "dashboard"]}>
+
+## New features
+
+**Console API coverage for seven more resources.** The orchestrator's admin API now exposes live `/v1/console/*` endpoints for end users, credentials, sessions, API keys, webhooks, policies, and audit events. Each endpoint is UCAN-gated with per-capability checks and writes audit records on every create, update, and delete. As these come online, the corresponding dashboard pages flip from mock data to real backend state without any dashboard changes.
+
+**API keys and webhook secrets are hashed at rest.** API keys and webhook signing secrets are now stored as SHA-256 hashes. The raw secret is returned exactly once — at create time, and again on rotation — and cannot be retrieved later. Make sure to capture the value when you create or rotate a key.
+
+**Email-code endpoints land in the orchestrator.** `/v1/email-code/start` and `/v1/email-code/verify` are now first-class orchestrator routes, owning email challenge issuance, code validation, and rate limiting end-to-end. This consolidates the email-code flow behind a single service. See [Authentication](/guides/authentication).
+
+## Updates
+
+**Standardized input validation across the admin API.** All new console routes use Zod schema validation for request bodies and query parameters, so client errors come back as consistent, structured `400` responses. Existing console routes will be retrofitted to the same pattern in a follow-up.
+
+</Update>
+
+<Update label="May 12, 2026" tags={["dashboard", "sdk", "orchestrator", "contracts"]}>
 
 ## New features
 
