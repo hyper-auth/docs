@@ -1,6 +1,6 @@
 ---
 title: "GET /api/accounts/predict"
-description: "Predicts the counterfactual smart account address for a given P-256 public key and salt."
+description: "Predicts the counterfactual ERC-4337 smart account address for a given P-256 passkey public key and CREATE2 salt without deploying the contract."
 ---
 
 Calls `getAddress` on the `hyperAuthFactory` contract to predict the counterfactual smart account address for a given P-256 public key and salt.

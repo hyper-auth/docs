@@ -1,6 +1,6 @@
 ---
 title: Smart Account Abstraction
-description: Why ERC-4337 account abstraction is central to HyperAuth, how HyperAuthFactory and CREATE2 make account addresses deterministic, and how passkey signatures work on-chain via the RIP-7212 P-256 precompile.
+description: How HyperAuth uses ERC-4337 account abstraction, CREATE2 deterministic addresses, and the RIP-7212 P-256 precompile to verify passkey signatures on-chain.
 ---
 
 Ethereum's original account model has an uncomfortable property for anyone who wants to build a seamless user experience: the only account type that can initiate a transaction is an Externally Owned Account, controlled by a private key, where the transaction fee must be paid in ETH. This means every new user must acquire ETH before they can do anything on-chain, every wallet is a raw private key with no programmable logic, and every authentication mechanism must ultimately reduce to ECDSA over secp256k1 — the single signature scheme Ethereum was built around.
