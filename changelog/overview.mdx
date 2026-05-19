@@ -1,49 +1,29 @@
 ---
-title: "Changelog"
-description: "Weekly release notes for HyperAuth, covering new features, updates, and bug fixes across the dashboard, widget SDK, orchestrator, and smart contracts."
-icon: "newspaper"
+title: "Product changelog"
+description: "Weekly release notes covering new features, updates, and bug fixes across the HyperAuth SDK, widget, dashboard, backend, and smart contracts."
+icon: "rss"
 ---
 
-<Update label="May 19, 2026" tags={["orchestrator", "dashboard"]}>
+<Update label="May 18, 2026" tags={["sdk", "backend", "contracts", "dashboard"]}>
 
 ## New features
 
-**Console API coverage for seven more resources.** The orchestrator's admin API now exposes live `/v1/console/*` endpoints for end users, credentials, sessions, API keys, webhooks, policies, and audit events. Each endpoint is UCAN-gated with per-capability checks and writes audit records on every create, update, and delete. As these come online, the corresponding dashboard pages flip from mock data to real backend state without any dashboard changes.
+**Email-code authentication flow.** A new passwordless sign-in path that sends a one-time code over email and mints a session SBT once verified. Available in the SDK widget today; drop it into any app alongside passkey sign-in. See [Authentication](/guides/authentication).
 
-**API keys and webhook secrets are hashed at rest.** API keys and webhook signing secrets are now stored as SHA-256 hashes. The raw secret is returned exactly once — at create time, and again on rotation — and cannot be retrieved later. Make sure to capture the value when you create or rotate a key.
+**`@hyperauth/widget` package.** An embeddable, zero-config auth widget — inline, overlay, or full-page — with built-in flows for passkey and email-code sign-in. Style it with your host CSS or use the bundled theme. See [UI components](/sdk-reference/ui-components).
 
-**Email-code endpoints land in the orchestrator.** `/v1/email-code/start` and `/v1/email-code/verify` are now first-class orchestrator routes, owning email challenge issuance, code validation, and rate limiting end-to-end. This consolidates the email-code flow behind a single service. See [Authentication](/guides/authentication).
+**Vue bindings.** First-class Vue 3 support via `@hyperauth/vue`, mirroring the React hook surface (`useLogin`, `useSession`, `useAccount`, `useRegistration`, and more). See [SDK reference](/sdk-reference/sdk-client).
 
-## Updates
-
-**Standardized input validation across the admin API.** All new console routes use Zod schema validation for request bodies and query parameters, so client errors come back as consistent, structured `400` responses. Existing console routes will be retrofitted to the same pattern in a follow-up.
-
-</Update>
-
-<Update label="May 12, 2026" tags={["dashboard", "sdk", "orchestrator", "contracts"]}>
-
-## New features
-
-**Email-code sign-in for the widget.** `@hyperauth/widget` now supports a Privy-style email-code flow as the entry point for new users. After you verify your email, the widget enrolls a passkey via the vault SharedWorker and issues a Session UCAN. A new `page` widget mode is available alongside `modal`, `drawer`, and `inline` for full-page sign-in routes. See [Authentication](/guides/authentication) and [UI components](/sdk-reference/ui-components).
-
-**Email-verification workflow on the orchestrator.** A new Inngest-driven workflow handles email-code issuance, SMTP delivery via Resend, code validation, rate limiting, and Session UCAN minting. Expired challenges are swept automatically. The orchestrator backs the widget's `/v1/email-code/start` and `/v1/email-code/verify` endpoints.
-
-**HyperAuth dashboard preview.** The console app is live in preview, with pages for apps, auth methods, branding, policies, users, sessions, credentials, API keys, webhooks, audit logs, team, and billing. Onboarding walks new operators through their first app. Pages render against a stable data boundary, with live `/v1/console/*` endpoints rolling out per resource.
+**Email-verify orchestrator (backend).** A new Inngest-powered backend service handles email code delivery, expiry sweeps, session minting, and revocation end-to-end. Self-hosters get a deployable orchestrator image; SDK users get a faster, more reliable email flow. See [Deploy](/guides/deploy).
 
 ## Updates
 
-**SDK plumbing in the dashboard.** The dashboard now mounts `@hyperauth/client` and `@hyperauth/react` providers and emits the required Content Security Policy headers for the vault SharedWorker. Auth pages (`login`, `signup`, `verify-email`, `forgot-password`, `reset-password`, `onboarding`) are wired against the SDK provider tree.
+**HyperAuth provider in the dashboard.** The HyperAuth admin dashboard now boots the SDK at the app root, with the required Content Security Policy directives emitted automatically in production. New `NEXT_PUBLIC_HYPERAUTH_*` environment variables let self-hosters point the dashboard at their own enclave, vault, and chain. See [Configuration](/sdk-reference/configuration).
 
-**Dashboard data boundary in place.** The dashboard now consumes data through a single `lib/api` seam that delegates to the orchestrator's `/v1/console/*` admin API as each endpoint comes online. Pages continue to render against the existing mock store until the matching real endpoint ships, so per-resource cutover is incremental and non-breaking.
+**Pimlico bundler error mapping.** Userop submission now surfaces structured errors from the Pimlico bundler instead of raw RPC payloads, so failed transactions are easier to diagnose. See [Bundler API](/api-reference/stateless/bundler).
 
-**Console admin API: orgs, members, and apps are live.** The first batch of `/v1/console/*` endpoints is shipping, with full CRUD for organizations (`/orgs`), members (`/orgs/:orgId/members`), and apps (`/orgs/:orgId/apps`). Deleting an org soft-archives it (`archived_at` is set); member and app deletes are hard. Every admin call is gated by a UCAN capability (for example `console.org.write`, `console.app.delete`) carried in the `Authorization: UCAN <envelope>` header alongside an `X-Session-Sbt` token. Every write also emits an `audit_events` row atomically with the mutation, so the audit log stays consistent with what actually happened. The dashboard cuts over per resource through the `lib/api` seam. See [UCAN delegation](/guides/ucan-delegation).
+## Bug fixes
 
-**TanStack Query mounted across the dashboard.** All dashboard pages now sit under a `QueryClientProvider`, enabling cached, refetchable data as the console API rolls out.
-
-**Dashboard environment variables.** Two new flags wire the dashboard to the orchestrator. `NEXT_PUBLIC_HYPERAUTH_API_URL` points at the admin API base and is required once real fetches are enabled. `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE` opts the dashboard into the SSE event tail. Both are documented in `apps/dashboard/.env.example`.
-
-## Fixes
-
-**`AccountHelper` constructor hardening.** The stateless lens contract now rejects zero-address inputs at construction, preventing accidental deployments pointed at an empty `DIDRegistry` or `HyperAuthFactory`. See [Contracts reference](/sdk-reference/contracts).
+**Smart account safety check.** `AccountHelper` now rejects a zero address in its constructor, preventing accidental deployment against an unset entrypoint. See [Contracts reference](/sdk-reference/contracts).
 
 </Update>

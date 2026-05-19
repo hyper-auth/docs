@@ -146,7 +146,7 @@
       },
       {
         "tab": "Changelog",
-        "icon": "newspaper",
+        "icon": "rss",
         "groups": [
           {
             "group": "Changelog",
