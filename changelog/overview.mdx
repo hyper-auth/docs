@@ -1,0 +1,29 @@
+---
+title: "Changelog"
+description: "New features, updates, and fixes shipping in HyperAuth."
+icon: "newspaper"
+---
+
+<Update label="May 19, 2026" tags={["dashboard", "sdk", "orchestrator", "contracts"]}>
+
+## New features
+
+**Email-code sign-in for the widget.** `@hyperauth/widget` now supports a Privy-style email-code flow as the entry point for new users. After verifying their email, users enroll a passkey via the vault SharedWorker and receive a Session UCAN. A new `page` widget mode is available alongside `modal`, `drawer`, and `inline` for full-page sign-in routes. See [Authentication](/guides/authentication) and [UI components](/sdk-reference/ui-components).
+
+**Email-verification workflow on the orchestrator.** A new Inngest-driven workflow handles email-code issuance, SMTP delivery via Resend, code validation, rate limiting, and Session UCAN minting. Expired challenges are swept automatically. The orchestrator backs the widget's `/v1/email-code/start` and `/v1/email-code/verify` endpoints.
+
+**HyperAuth dashboard preview.** The console app is live in preview, with pages for apps, auth methods, branding, policies, users, sessions, credentials, API keys, webhooks, audit logs, team, and billing. Onboarding walks new operators through their first app. Pages render against a stable data boundary, with live `/v1/console/*` endpoints rolling out per resource.
+
+## Updates
+
+**SDK plumbing in the dashboard.** The dashboard now mounts `@hyperauth/client` and `@hyperauth/react` providers and emits the required Content Security Policy headers for the vault SharedWorker. Auth pages (`login`, `signup`, `verify-email`, `forgot-password`, `reset-password`, `onboarding`) are wired against the SDK provider tree.
+
+**TanStack Query mounted across the dashboard.** All dashboard pages now sit under a `QueryClientProvider`, paving the way for cached, real-time data as `/v1/console/*` endpoints come online.
+
+**Live-event flag for the dashboard.** A new `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE` flag prepares the dashboard for the SSE event tail. The flag is a no-op until the orchestrator's event stream ships.
+
+## Fixes
+
+**`AccountHelper` constructor hardening.** The stateless lens contract now rejects zero-address inputs at construction, preventing accidental deployments pointed at an empty `DIDRegistry` or `HyperAuthFactory`. See [Contracts reference](/sdk-reference/contracts).
+
+</Update>
