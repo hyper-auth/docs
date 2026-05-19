@@ -1,6 +1,6 @@
 ---
 title: "Changelog"
-description: "Weekly release notes for HyperAuth — new features, updates, and bug fixes across the dashboard, widget SDK, orchestrator, and contracts."
+description: "Weekly release notes for HyperAuth, covering new features, updates, and bug fixes across the dashboard, widget SDK, orchestrator, and smart contracts."
 icon: "newspaper"
 ---
 
@@ -22,7 +22,7 @@ icon: "newspaper"
 
 **TanStack Query mounted across the dashboard.** All dashboard pages now sit under a `QueryClientProvider`, enabling cached, refetchable data as the console API rolls out.
 
-**Dashboard environment variables.** Two new flags wire the dashboard to the orchestrator: `NEXT_PUBLIC_HYPERAUTH_API_URL` points at the admin API base and is required once real fetches are enabled, and `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE` opts the dashboard into the SSE event tail. Both are documented in `apps/dashboard/.env.example`.
+**Dashboard environment variables.** Two new flags wire the dashboard to the orchestrator. `NEXT_PUBLIC_HYPERAUTH_API_URL` points at the admin API base and is required once real fetches are enabled. `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE` opts the dashboard into the SSE event tail. Both are documented in `apps/dashboard/.env.example`.
 
 ## Fixes
 
