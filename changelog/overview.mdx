@@ -14,6 +14,8 @@ icon: "newspaper"
 
 **HyperAuth dashboard preview.** The console app is live in preview, with pages for apps, auth methods, branding, policies, users, sessions, credentials, API keys, webhooks, audit logs, team, and billing. Onboarding walks new operators through their first app. Pages render against a stable data boundary, with live `/v1/console/*` endpoints rolling out per resource.
 
+**Live event tail for the dashboard.** A new `GET /v1/console/events` SSE endpoint streams real-time mutations from `audit_events`, `sessions`, `webhooks`, and `credentials` to the dashboard. Postgres `LISTEN/NOTIFY` triggers fan out to per-subscriber queues filtered by `app_id`, with 25 s heartbeats and a `rewind-required` sentinel when a slow client overflows. Auth uses a short-lived (≤5 min), channel-scoped UCAN passed as a query token because `EventSource` cannot set headers. See [GET /v1/console/events](/api-reference/console/events).
+
 ## Updates
 
 **SDK plumbing in the dashboard.** The dashboard now mounts `@hyperauth/client` and `@hyperauth/react` providers and emits the required Content Security Policy headers for the vault SharedWorker. Auth pages (`login`, `signup`, `verify-email`, `forgot-password`, `reset-password`, `onboarding`) are wired against the SDK provider tree.
