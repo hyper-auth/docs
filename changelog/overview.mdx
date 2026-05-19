@@ -30,6 +30,20 @@ icon: "newspaper"
 
 **HyperAuth dashboard preview.** The console app is live in preview, with pages for apps, auth methods, branding, policies, users, sessions, credentials, API keys, webhooks, audit logs, team, and billing. Onboarding walks new operators through their first app. Pages render against a stable data boundary, with live `/v1/console/*` endpoints rolling out per resource.
 
+**Audit log ↔ ledger cross-reference.** Payment audit events now link to the TigerBeetle transfers they describe, so you can pivot from a transfer to its audit context (or the reverse) for forensic review. Each settlement writes two audit rows: one for the funds hold (`transfer.funds_hold`) and one for the settlement (`transfer.settle`). The console audit-events API exposes the link via a new `tb_link` field on every row:
+
+```json
+{
+  "id": "0e7e5a1f-…",
+  "action": "transfer.settle",
+  "resource": "transfer",
+  "resourceId": "…",
+  "tb_link": { "transferId": "…" }
+}
+```
+
+Rows for non-ledger events return `tb_link: null`. The link is bidirectional: each TigerBeetle transfer encodes its audit-event UUID in `user_data_128`, so you can always resolve a transfer back to its audit row.
+
 ## Updates
 
 **SDK plumbing in the dashboard.** The dashboard now mounts `@hyperauth/client` and `@hyperauth/react` providers and emits the required Content Security Policy headers for the vault SharedWorker. Auth pages (`login`, `signup`, `verify-email`, `forgot-password`, `reset-password`, `onboarding`) are wired against the SDK provider tree.
