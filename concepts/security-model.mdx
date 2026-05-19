@@ -1,6 +1,6 @@
 ---
 title: Security Model
-description: The threat model behind HyperAuth — why passkeys replace passwords, how the WASM boundary contains key material, what encrypted shares protect against, and where the trust boundaries actually lie in the dual-worker architecture.
+description: HyperAuth's threat model — why passkeys replace passwords, how the WASM boundary contains key material, and where the trust boundaries actually lie.
 ---
 
 Security models are most useful when they are explicit about what they protect against and honest about what they do not. HyperAuth is designed around a specific threat model: a user whose credentials could be phished, a server that could be compromised, and an attacker who might obtain one half of a split secret. The system is not designed to be impervious to a compromised device or a malicious user agent — no client-side system can offer that guarantee. What it can offer is a clear account of where trust is placed, what each layer protects, and what the consequences of a breach at each layer are.

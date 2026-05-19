@@ -1,6 +1,6 @@
 ---
 title: "POST /api/dids"
-description: "Registers a DID after the identifier has been verified."
+description: "Registers a new on-chain DID after the identifier (email or phone) has been verified, binding the passkey credential to the decentralized identifier."
 ---
 
 Registers a DID after the identifier has been verified. For non-handle channels, an `attestation` object must be present and is validated against the `ATTESTATION_SIGNING_KEY` before the DO call is made.

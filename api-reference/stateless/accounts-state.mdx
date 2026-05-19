@@ -1,6 +1,6 @@
 ---
 title: "GET /api/accounts/state"
-description: "Returns decoded on-chain state for a smart account: nonce, DID, active status, and public key coordinates."
+description: "Returns the decoded on-chain state for a HyperAuth smart account: ERC-4337 nonce, linked DID, active status, and P-256 public key coordinates."
 ---
 
 Calls `getAccountState` on the `accountHelper` contract and decodes the ABI-encoded response (5 × 32-byte slots: nonce, did, isActive, pubKeyX, pubKeyY).

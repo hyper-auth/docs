@@ -1,6 +1,6 @@
 ---
 title: System Architecture
-description: Why HyperAuth is built the way it is — the dual-worker model, the split between stateless signer and stateful vault, OPFS persistence without SharedArrayBuffer, and the decision to run cryptography inside SQLite.
+description: How HyperAuth is architected — the dual-worker model, the split between stateless signer and stateful vault, OPFS persistence, and SQLite-based crypto.
 ---
 
 HyperAuth is an identity system that wants to satisfy two properties that are almost always in tension: it should work when the user is offline, and it should be verifiable by parties who have never met the user. Most identity systems satisfy one of these by sacrificing the other. A server-side database of credentials is trivially verifiable but fails when the network is unavailable or when you want to stop trusting the server. A purely local secret works offline but tells strangers nothing. The architecture of HyperAuth is largely a series of design decisions that try to hold both properties simultaneously.

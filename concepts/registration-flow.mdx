@@ -1,6 +1,6 @@
 ---
 title: The Registration Pipeline
-description: A deep examination of the twelve-phase registration process — why it is structured as a pipeline rather than a single call, where the failure boundaries are, and what each phase is actually doing and why.
+description: A deep look at HyperAuth's twelve-phase registration pipeline — why it's structured as discrete phases, where failure boundaries lie, and what each phase does.
 ---
 
 Registration in HyperAuth is not a single operation that either succeeds or fails. It is a pipeline of twelve discrete phases, each with its own preconditions, its own failure modes, and its own effects. Understanding why the pipeline has this structure — why these particular things happen in this particular order — requires understanding that registration is actually four fundamentally different kinds of work bundled into a single user experience: namespace reservation, hardware credential creation, cryptographic identity generation, and on-chain account deployment. Each kind of work lives at a different layer of the stack, is performed by a different party, and can fail for different reasons. The pipeline is the recognition that these cannot be collapsed into a single atomic operation.
