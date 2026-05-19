@@ -4,7 +4,25 @@ description: "Weekly release notes for HyperAuth, covering new features, updates
 icon: "newspaper"
 ---
 
-<Update label="May 19, 2026" tags={["dashboard", "sdk", "orchestrator", "contracts"]}>
+<Update label="May 19, 2026" tags={["orchestrator", "dashboard"]}>
+
+## New features
+
+**Real-time event stream for the dashboard.** The orchestrator now exposes a server-sent events endpoint at `GET /v1/console/events` that streams live mutations to `audit_events`, `sessions`, `webhooks`, and `credentials`. Events are scoped per app, authenticated via a short-lived UCAN passed as a query token, and include 25-second heartbeats. When a client falls too far behind, it receives a `rewind-required` sentinel so it can resync. Enable it in the dashboard with `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE=true`.
+
+**Audit log ↔ ledger cross-references.** Audit events now link to their underlying TigerBeetle transfers and session budget accounts. The console audit list response includes a new `tb_link.transferId` field on each event where a transfer exists, powering a "view ledger entry" affordance in the dashboard. Lookups work in both directions, so you can trace any payment intent step from an audit row to the ledger entry and back.
+
+## Updates
+
+**Session minting writes the budget account ID.** When a session is minted, the orchestrator now records the TigerBeetle session-budget account ID on the session row, making it directly queryable alongside the session itself. The write is idempotent across retries.
+
+<Tip>
+  See the [DID model](/concepts/did-model) and [Smart account abstraction](/concepts/smart-account-abstraction) pages for background on how sessions, audit events, and the ledger fit together.
+</Tip>
+
+</Update>
+
+<Update label="May 12, 2026" tags={["dashboard", "sdk", "orchestrator", "contracts"]}>
 
 ## New features
 
