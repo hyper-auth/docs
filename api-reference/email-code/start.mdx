@@ -1,6 +1,6 @@
 ---
 title: "POST /v1/email-code/start"
-description: "Begin an email-code challenge for a sign-in. Generates a 6-digit code, sends it via Resend, and rate-limits by email and app."
+description: "Begin an email-code sign-in challenge. Generates a 6-digit code, sends it via Resend, and rate-limits requests per email address and app."
 ---
 
 Begins an email-code challenge. The orchestrator creates a challenge row, hashes a fresh 6-digit code, fires an Inngest event that delivers the code via Resend, and returns the `challenge_id` your client uses to verify.

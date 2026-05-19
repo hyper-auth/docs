@@ -1,6 +1,6 @@
 ---
 title: "Console: Policies"
-description: "Manage auth policies and attestation requirements per app. Each app can have at most one active primary policy."
+description: "Manage auth policies and attestation requirements per app. Each app may have one active primary policy; creating a second returns 409 CONFLICT."
 ---
 
 Manage auth policies for an app. A policy bundles a set of attestation requirements (for example, "verified email" or "passkey present"). Each app can have at most one active primary policy; attempts to create a second return `409 CONFLICT`.
