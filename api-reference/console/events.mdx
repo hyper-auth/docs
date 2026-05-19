@@ -1,9 +1,9 @@
 ---
 title: "GET /v1/console/events"
-description: "Server-Sent Events stream of live audit, session, webhook, and credential mutations for the HyperAuth dashboard, authenticated by a short-lived UCAN."
+description: "Server-Sent Events stream of live audit, session, webhook, and credential mutations for the HyperAuth dashboard, authed via short-lived UCAN."
 ---
 
-Streams Server-Sent Events (SSE) for a single resource channel so the dashboard can render a live tail of audit entries, session changes, webhook activity, and credential updates without polling. The orchestrator backs the stream with Postgres `LISTEN/NOTIFY` triggers and fans events out to subscribers filtered by `app_id`.
+Streams Server-Sent Events (SSE) for one resource channel so the dashboard can render a live tail of audit entries, session changes, webhook activity, and credential updates. The orchestrator backs the stream with Postgres `LISTEN/NOTIFY` triggers and fans events out to subscribers filtered by `app_id`.
 
 Use this endpoint when you want a "live" view next to a list page in the console — for example, the audit log feed or the active-sessions panel. It is **read-only** and intended for the dashboard, not for end-user-facing apps.
 
@@ -107,4 +107,4 @@ es.addEventListener("token-expired", () => {
 - One Postgres `LISTEN` connection is opened per channel on the first subscriber and reused for the process lifetime.
 - Per-subscriber queues are bounded at **1000** pending events. Bursts beyond that emit `rewind-required` rather than dropping silently.
 - Heartbeats fire every **25 s** as SSE comments (`: heartbeat`) so intermediaries see traffic on idle streams.
-- The orchestrator enables the `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE` dashboard flag to opt into this stream.
+- Set `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE=true` in the dashboard environment to opt into this stream.
