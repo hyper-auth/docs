@@ -18,9 +18,11 @@ icon: "newspaper"
 
 **SDK plumbing in the dashboard.** The dashboard now mounts `@hyperauth/client` and `@hyperauth/react` providers and emits the required Content Security Policy headers for the vault SharedWorker. Auth pages (`login`, `signup`, `verify-email`, `forgot-password`, `reset-password`, `onboarding`) are wired against the SDK provider tree.
 
-**TanStack Query mounted across the dashboard.** All dashboard pages now sit under a `QueryClientProvider`, paving the way for cached, real-time data as `/v1/console/*` endpoints come online.
+**Dashboard data boundary in place.** The dashboard now consumes data through a single `lib/api` seam that delegates to the orchestrator's `/v1/console/*` admin API as each endpoint comes online. Pages continue to render against the existing mock store until the matching real endpoint ships, so per-resource cutover is incremental and non-breaking.
 
-**Live-event flag for the dashboard.** A new `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE` flag prepares the dashboard for the SSE event tail. The flag is a no-op until the orchestrator's event stream ships.
+**TanStack Query mounted across the dashboard.** All dashboard pages now sit under a `QueryClientProvider`, enabling cached, refetchable data as the console API rolls out.
+
+**Dashboard environment variables.** Two new flags wire the dashboard to the orchestrator: `NEXT_PUBLIC_HYPERAUTH_API_URL` points at the admin API base and is required once real fetches are enabled, and `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE` opts the dashboard into the SSE event tail. Both are documented in `apps/dashboard/.env.example`.
 
 ## Fixes
 
