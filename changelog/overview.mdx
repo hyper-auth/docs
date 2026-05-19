@@ -1,7 +1,7 @@
 ---
-title: "Changelog"
-description: "Weekly release notes for HyperAuth, covering new features, updates, and bug fixes across the dashboard, widget SDK, orchestrator, and smart contracts."
-icon: "newspaper"
+title: "Product changelog"
+description: "Weekly release notes covering new features, updates, and bug fixes across the HyperAuth SDK, widget, dashboard, backend, and smart contracts."
+icon: "rss"
 ---
 
 <Update label="May 19, 2026" tags={["orchestrator"]}>
@@ -20,24 +20,32 @@ icon: "newspaper"
 
 ## New features
 
-**Email-code sign-in for the widget.** `@hyperauth/widget` now supports a Privy-style email-code flow as the entry point for new users. After you verify your email, the widget enrolls a passkey via the vault SharedWorker and issues a Session UCAN. A new `page` widget mode is available alongside `modal`, `drawer`, and `inline` for full-page sign-in routes. See [Authentication](/guides/authentication) and [UI components](/sdk-reference/ui-components).
+**Live event tail for the dashboard.** A new server-sent events stream (`GET /v1/console/events`) pushes audit events, session changes, webhook activity, and credential updates to the dashboard in real time. Streams are scoped per app via the `channel` and `app` query parameters. Connections authenticate with a short-lived (5-minute) UCAN passed as a query token and send heartbeats every 25 seconds. If a subscriber falls behind its 1000-event queue, the server emits a `rewind-required` sentinel so the client can resync. Expired tokens close the stream with a `token-expired` event. Enable it in the dashboard by setting `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE=true`. See [Architecture](/concepts/architecture).
 
-**Email-verification workflow on the orchestrator.** A new Inngest-driven workflow handles email-code issuance, SMTP delivery via Resend, code validation, rate limiting, and Session UCAN minting. Expired challenges are swept automatically. The orchestrator backs the widget's `/v1/email-code/start` and `/v1/email-code/verify` endpoints.
+</Update>
+
+<Update label="May 12, 2026" tags={["dashboard", "sdk", "orchestrator", "contracts"]}>
+
+## New features
+
+**Email-code authentication flow.** A new passwordless sign-in path that sends a one-time code over email and mints a session SBT once verified. Available in the SDK widget today; drop it into any app alongside passkey sign-in. See [Authentication](/guides/authentication).
+
+**`@hyperauth/widget` package.** An embeddable, zero-config auth widget — inline, overlay, or full-page — with built-in flows for passkey and email-code sign-in. Style it with your host CSS or use the bundled theme. See [UI components](/sdk-reference/ui-components).
+
+**Postgres control-plane on the orchestrator.** The orchestrator now ships with a Postgres 17 service and a Drizzle ORM client. This lays the foundation for the control-plane tables that back upcoming admin and console endpoints. If you run the orchestrator locally, `docker compose` now starts a `postgres` service with a healthcheck and a named volume. Two new environment variables wire it up: `DATABASE_URL` (required) and `DATABASE_MAX_CONNECTIONS` (defaults to `10`). Three scripts manage migrations: `bun run db:generate`, `bun run db:migrate`, and `bun run db:studio`. No schema is published yet; the first tables ship in the next release.
 
 **HyperAuth dashboard preview.** The console app is live in preview, with pages for apps, auth methods, branding, policies, users, sessions, credentials, API keys, webhooks, audit logs, team, and billing. Onboarding walks new operators through their first app. Pages render against a stable data boundary, with live `/v1/console/*` endpoints rolling out per resource.
 
+**Email-verify orchestrator (backend).** A new Inngest-powered backend service handles email code delivery, expiry sweeps, session minting, and revocation end-to-end. Self-hosters get a deployable orchestrator image; SDK users get a faster, more reliable email flow. See [Deploy](/guides/deploy).
+
 ## Updates
 
-**SDK plumbing in the dashboard.** The dashboard now mounts `@hyperauth/client` and `@hyperauth/react` providers and emits the required Content Security Policy headers for the vault SharedWorker. Auth pages (`login`, `signup`, `verify-email`, `forgot-password`, `reset-password`, `onboarding`) are wired against the SDK provider tree.
+**HyperAuth provider in the dashboard.** The HyperAuth admin dashboard now boots the SDK at the app root, with the required Content Security Policy directives emitted automatically in production. New `NEXT_PUBLIC_HYPERAUTH_*` environment variables let self-hosters point the dashboard at their own enclave, vault, and chain. See [Configuration](/sdk-reference/configuration).
 
-**Dashboard data boundary in place.** The dashboard now consumes data through a single `lib/api` seam that delegates to the orchestrator's `/v1/console/*` admin API as each endpoint comes online. Pages continue to render against the existing mock store until the matching real endpoint ships, so per-resource cutover is incremental and non-breaking.
+**Pimlico bundler error mapping.** Userop submission now surfaces structured errors from the Pimlico bundler instead of raw RPC payloads, so failed transactions are easier to diagnose. See [Bundler API](/api-reference/stateless/bundler).
 
-**TanStack Query mounted across the dashboard.** All dashboard pages now sit under a `QueryClientProvider`, enabling cached, refetchable data as the console API rolls out.
+## Bug fixes
 
-**Dashboard environment variables.** Two new flags wire the dashboard to the orchestrator. `NEXT_PUBLIC_HYPERAUTH_API_URL` points at the admin API base and is required once real fetches are enabled. `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE` opts the dashboard into the SSE event tail. Both are documented in `apps/dashboard/.env.example`.
-
-## Fixes
-
-**`AccountHelper` constructor hardening.** The stateless lens contract now rejects zero-address inputs at construction, preventing accidental deployments pointed at an empty `DIDRegistry` or `HyperAuthFactory`. See [Contracts reference](/sdk-reference/contracts).
+**Smart account safety check.** `AccountHelper` now rejects a zero address in its constructor, preventing accidental deployment against an unset entrypoint. See [Contracts reference](/sdk-reference/contracts).
 
 </Update>
