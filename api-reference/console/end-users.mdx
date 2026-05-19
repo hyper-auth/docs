@@ -1,0 +1,94 @@
+---
+title: "Console: End users"
+description: "List, read, update, suspend, and delete end-user records for an app through the UCAN-gated console.end_user.* admin capabilities."
+---
+
+Manage end-user records belonging to a specific app. End users self-register through the SDK and email-code flows — the console exposes only read, update, and delete. There is no `POST` to create end users directly.
+
+All routes are nested under `/v1/console/orgs/:orgId/apps/:appId/end-users`.
+
+## List end users
+
+```http
+GET /v1/console/orgs/:orgId/apps/:appId/end-users
+```
+
+Required capability: `console.end_user.read`.
+
+### Query parameters
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `page` | integer | `1` | 1-indexed page number |
+| `pageSize` | integer | `25` | Max `100` |
+| `filter` | string | — | Substring match against `displayName` or `primaryEmail` |
+
+### Response (200)
+
+```json
+{
+  "rows": [
+    {
+      "id": "eu_01HZ...",
+      "appId": "app_01H...",
+      "displayName": "Alice",
+      "primaryEmail": "alice@example.com",
+      "status": "active",
+      "createdAt": "2026-05-19T10:00:00.000Z",
+      "lastSeenAt": "2026-05-19T11:32:08.000Z"
+    }
+  ],
+  "total": 42
+}
+```
+
+## Get one end user
+
+```http
+GET /v1/console/orgs/:orgId/apps/:appId/end-users/:id
+```
+
+Required capability: `console.end_user.read`.
+
+Returns a single end-user record, or `404 { "error": "NOT_FOUND" }` if the id does not exist within the app.
+
+## Update an end user
+
+```http
+PATCH /v1/console/orgs/:orgId/apps/:appId/end-users/:id
+```
+
+Required capability: `console.end_user.write`.
+
+### Request body
+
+| Field | Type | Description |
+|---|---|---|
+| `displayName` | string | New display name |
+| `status` | `"active" \| "suspended"` | Suspending an end user blocks new sessions |
+| `primaryEmail` | string (email) | New primary email |
+
+All fields are optional; only provided fields are updated. The request body is strict — unknown fields return `400 validation_error`.
+
+### Example
+
+```bash
+curl -X PATCH https://api.hyperauth.dev/v1/console/orgs/$ORG/apps/$APP/end-users/$ID \
+  -H "Authorization: Bearer $UCAN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "status": "suspended" }'
+```
+
+## Delete an end user
+
+```http
+DELETE /v1/console/orgs/:orgId/apps/:appId/end-users/:id
+```
+
+Required capability: `console.end_user.delete`.
+
+Hard-deletes the record. Associated credentials and sessions cascade. Returns `204 No Content`.
+
+<Warning>
+Deletion is irreversible. Use `PATCH` with `status: "suspended"` if you want to block access without losing history.
+</Warning>

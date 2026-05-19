@@ -30,6 +30,10 @@ icon: "newspaper"
 
 **HyperAuth dashboard preview.** The console app is live in preview, with pages for apps, auth methods, branding, policies, users, sessions, credentials, API keys, webhooks, audit logs, team, and billing. Onboarding walks new operators through their first app. Pages render against a stable data boundary, with live `/v1/console/*` endpoints rolling out per resource.
 
+**Console Admin API expanded to seven more resources.** The orchestrator now serves UCAN-gated `/v1/console/*` routes for end users, credentials, sessions, API keys, webhooks, policies, and audit events. API key and webhook secrets are returned only on create and rotate; sessions are soft-revoked; audit events are append-only. See the new [Console API overview](/api-reference/console/overview).
+
+**Public `/v1/email-code/*` endpoints.** The orchestrator now exposes `POST /v1/email-code/start` and `POST /v1/email-code/verify` for the widget's email-code sign-in flow. Requests are rate-limited per `(email, app_id)` bucket; verification runs in a serialized transaction so concurrent attempts cannot race. See [Email code](/api-reference/email-code/start).
+
 ## Updates
 
 **SDK plumbing in the dashboard.** The dashboard now mounts `@hyperauth/client` and `@hyperauth/react` providers and emits the required Content Security Policy headers for the vault SharedWorker. Auth pages (`login`, `signup`, `verify-email`, `forgot-password`, `reset-password`, `onboarding`) are wired against the SDK provider tree.

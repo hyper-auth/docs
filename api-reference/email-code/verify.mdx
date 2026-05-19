@@ -1,0 +1,59 @@
+---
+title: "POST /v1/email-code/verify"
+description: "Verify a 6-digit email code against a challenge. Returns the verified email and app on success; tracks attempts and expiry per challenge."
+---
+
+Verifies the 6-digit code that the user received in their email against the challenge created by [`/v1/email-code/start`](/api-reference/email-code/start). On success, the challenge is marked `verified` and the orchestrator fires an Inngest event so downstream flows (passkey enrollment, Session UCAN minting) can proceed.
+
+This is a public endpoint — no UCAN required.
+
+## Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `challenge_id` | string | Yes | Value returned by `/v1/email-code/start` |
+| `code` | string | Yes | The 6-digit code the user typed (must match `^\d{6}$`) |
+
+## Response (200)
+
+```json
+{
+  "verified": true,
+  "challenge_id": "01HZ...",
+  "request_id": "01HZ...",
+  "email": "alice@example.com",
+  "app_id": "app_01H..."
+}
+```
+
+## Errors
+
+| Code | `error` | Condition |
+|---|---|---|
+| `400` | `validation_error` | Body is not valid JSON, or `code` does not match `^\d{6}$` |
+| `401` | `invalid_code` | Code does not match. Response includes `attempts_remaining`. |
+| `404` | `challenge_not_found` | Unknown `challenge_id` |
+| `409` | `invalid_state` | Challenge is already `verified`, `cancelled`, or in another non-pending state. Response includes the current `state`. |
+| `410` | `expired` | Challenge passed its `expires_at` |
+| `429` | `attempts_exhausted` | Challenge reached its `maxAttempts` cap |
+
+### Invalid-code response
+
+```json
+{ "error": "invalid_code", "attempts_remaining": 4 }
+```
+
+## Example
+
+```bash
+curl -X POST https://api.hyperauth.dev/v1/email-code/verify \
+  -H "Content-Type: application/json" \
+  -d '{
+    "challenge_id": "01HZ...",
+    "code": "482915"
+  }'
+```
+
+## Concurrency
+
+Verification runs inside a transaction with `SELECT ... FOR UPDATE` on the challenge row, so simultaneous verify attempts cannot double-count attempts or both succeed.

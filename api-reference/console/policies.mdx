@@ -1,0 +1,119 @@
+---
+title: "Console: Policies"
+description: "Manage auth policies and attestation requirements per app. Each app may have one active primary policy; creating a second returns 409 CONFLICT."
+---
+
+Manage auth policies for an app. A policy bundles a set of attestation requirements (for example, "verified email" or "passkey present"). Each app can have at most one active primary policy; attempts to create a second return `409 CONFLICT`.
+
+## List policies
+
+```http
+GET /v1/console/orgs/:orgId/apps/:appId/policies
+```
+
+Required capability: `console.policy.read`.
+
+### Query parameters
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `page` | integer | `1` | 1-indexed page number |
+| `pageSize` | integer | `25` | Max `100` |
+
+### Response (200)
+
+```json
+{
+  "rows": [
+    {
+      "id": "pol_01HZ...",
+      "appId": "app_01H...",
+      "name": "Default",
+      "isPrimary": true,
+      "attestations": [
+        { "type": "email_verified" },
+        { "type": "passkey_present" }
+      ],
+      "createdAt": "2026-05-19T10:00:00.000Z",
+      "updatedAt": "2026-05-19T10:00:00.000Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+## Get a single policy
+
+```http
+GET /v1/console/orgs/:orgId/apps/:appId/policies/:id
+```
+
+Required capability: `console.policy.read`.
+
+## Create a policy
+
+```http
+POST /v1/console/orgs/:orgId/apps/:appId/policies
+```
+
+Required capability: `console.policy.write`.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | Yes | Human-readable name (1–255 chars) |
+| `isPrimary` | boolean | No | If `true`, this policy becomes the app's primary. Only one allowed per app. |
+| `attestations` | object[] | No | List of attestation requirement objects; defaults to `[]` |
+
+### Response (201)
+
+Returns the full policy record.
+
+### Errors
+
+| Code | `error` | Condition |
+|---|---|---|
+| `400` | `validation_error` | Missing or malformed fields |
+| `409` | `CONFLICT` | An active primary policy already exists for this app |
+
+### Example
+
+```bash
+curl -X POST https://api.hyperauth.dev/v1/console/orgs/$ORG/apps/$APP/policies \
+  -H "Authorization: Bearer $UCAN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Default",
+    "isPrimary": true,
+    "attestations": [{ "type": "email_verified" }]
+  }'
+```
+
+## Update a policy
+
+```http
+PATCH /v1/console/orgs/:orgId/apps/:appId/policies/:id
+```
+
+Required capability: `console.policy.write`.
+
+### Request body
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | string | New name (1–255 chars) |
+| `isPrimary` | boolean | Promote or demote this policy |
+| `attestations` | object[] | Replacement attestation list |
+
+All fields are optional. Setting `isPrimary: true` while another primary policy is active returns `409 CONFLICT`.
+
+## Delete a policy
+
+```http
+DELETE /v1/console/orgs/:orgId/apps/:appId/policies/:id
+```
+
+Required capability: `console.policy.delete`.
+
+Hard-deletes the policy. Returns `204 No Content`.

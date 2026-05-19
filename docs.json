@@ -118,6 +118,26 @@
             ]
           },
           {
+            "group": "Email code",
+            "pages": [
+              "api-reference/email-code/start",
+              "api-reference/email-code/verify"
+            ]
+          },
+          {
+            "group": "Console (Admin API)",
+            "pages": [
+              "api-reference/console/overview",
+              "api-reference/console/end-users",
+              "api-reference/console/credentials",
+              "api-reference/console/sessions",
+              "api-reference/console/api-keys",
+              "api-reference/console/webhooks",
+              "api-reference/console/policies",
+              "api-reference/console/audit-events"
+            ]
+          },
+          {
             "group": "Indexer",
             "pages": [
               "api-reference/indexer/proxy"

@@ -1,0 +1,68 @@
+---
+title: "Console: Sessions"
+description: "List and revoke end-user sessions for an app. Sessions are soft-revoked rather than deleted so the audit trail is preserved for compliance."
+---
+
+Inspect end-user sessions and revoke them on demand. Sessions are never hard-deleted from the console — revoking sets `revokedAt` so the row stays available for audit.
+
+## List sessions for an end user
+
+```http
+GET /v1/console/orgs/:orgId/apps/:appId/end-users/:userId/sessions
+```
+
+Required capability: `console.session.read`.
+
+### Query parameters
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `page` | integer | `1` | 1-indexed page number |
+| `pageSize` | integer | `25` | Max `100` |
+
+### Response (200)
+
+```json
+{
+  "rows": [
+    {
+      "id": "ses_01HZ...",
+      "endUserId": "eu_01HZ...",
+      "appId": "app_01H...",
+      "sbtTokenId": "1234567890",
+      "tbBudgetAccountId": "987654321",
+      "startedAt": "2026-05-19T10:00:00.000Z",
+      "lastActivityAt": "2026-05-19T11:32:08.000Z",
+      "revokedAt": null
+    }
+  ],
+  "total": 1
+}
+```
+
+BigInt fields (`sbtTokenId`, `tbBudgetAccountId`) are returned as decimal strings to avoid JavaScript precision loss.
+
+## Get a single session
+
+```http
+GET /v1/console/orgs/:orgId/apps/:appId/sessions/:id
+```
+
+Required capability: `console.session.read`.
+
+## Revoke a session
+
+```http
+POST /v1/console/orgs/:orgId/apps/:appId/sessions/:id/revoke
+```
+
+Required capability: `console.session.revoke`.
+
+Sets `revokedAt = now()` on the session row. The session is no longer valid for authenticated requests, but the record is retained for audit and analytics. Returns the updated session.
+
+### Example
+
+```bash
+curl -X POST https://api.hyperauth.dev/v1/console/orgs/$ORG/apps/$APP/sessions/$SES_ID/revoke \
+  -H "Authorization: Bearer $UCAN_TOKEN"
+```

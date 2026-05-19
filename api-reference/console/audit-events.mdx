@@ -1,0 +1,68 @@
+---
+title: "Console: Audit events"
+description: "Read the append-only audit log for an app. Filter events by actor type, action, resource, and time range to export them into your SIEM."
+---
+
+Read the append-only audit log of console-side changes. Audit events are written automatically by the audit hook whenever a console route mutates state — there is no `POST`, `PATCH`, or `DELETE`. Use this endpoint to export events into your own SIEM or analytics pipeline.
+
+Results are ordered by `timestamp DESC` by default.
+
+## List audit events
+
+```http
+GET /v1/console/orgs/:orgId/apps/:appId/audit-events
+```
+
+Required capability: `console.audit.read`.
+
+### Query parameters
+
+| Field | Type | Description |
+|---|---|---|
+| `page` | integer | 1-indexed page number (default `1`) |
+| `pageSize` | integer | Max `100` (default `25`) |
+| `actor_type` | string | Filter by actor type (for example `admin`, `system`) |
+| `action` | string | Filter by action (for example `create`, `update`, `delete`) |
+| `resource` | string | Filter by resource name (for example `api_key`, `webhook`) |
+| `since` | ISO 8601 | Only include events at or after this timestamp |
+| `until` | ISO 8601 | Only include events at or before this timestamp |
+
+### Response (200)
+
+```json
+{
+  "rows": [
+    {
+      "id": "ae_01HZ...",
+      "appId": "app_01H...",
+      "actorType": "admin",
+      "actorId": "did:key:z6Mk...",
+      "action": "create",
+      "resource": "api_key",
+      "resourceId": "ak_01HZ...",
+      "diff": { "after": { "name": "Server-side billing job" } },
+      "timestamp": "2026-05-19T11:32:08.000Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+### Example: every change in the last 24 hours
+
+```bash
+SINCE=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+
+curl "https://api.hyperauth.dev/v1/console/orgs/$ORG/apps/$APP/audit-events?since=$SINCE&pageSize=100" \
+  -H "Authorization: Bearer $UCAN_TOKEN"
+```
+
+## Get a single audit event
+
+```http
+GET /v1/console/orgs/:orgId/apps/:appId/audit-events/:id
+```
+
+Required capability: `console.audit.read`.
+
+Returns the full event or `404 { "error": "NOT_FOUND" }`.

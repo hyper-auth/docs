@@ -1,0 +1,111 @@
+---
+title: "Console: API keys"
+description: "Create, rotate, and revoke server-to-server API keys for an app. Plaintext secrets are returned once on create and rotate."
+---
+
+Manage server-to-server API keys for an app. Secrets are hashed at rest and the plaintext value is returned only on create and rotate — capture it immediately.
+
+API keys have the prefix `hak_` and use `sha256` hashing. The first 8 characters of the secret are stored as a non-sensitive `prefix` for display.
+
+## List API keys
+
+```http
+GET /v1/console/orgs/:orgId/apps/:appId/api-keys
+```
+
+Required capability: `console.api_key.read`.
+
+### Query parameters
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `page` | integer | `1` | 1-indexed page number |
+| `pageSize` | integer | `25` | Max `100` |
+
+### Response (200)
+
+```json
+{
+  "rows": [
+    {
+      "id": "ak_01HZ...",
+      "appId": "app_01H...",
+      "name": "Server-side billing job",
+      "prefix": "AbCdEfGh",
+      "createdAt": "2026-05-19T10:00:00.000Z",
+      "lastUsedAt": "2026-05-19T11:32:08.000Z",
+      "revokedAt": null
+    }
+  ],
+  "total": 1
+}
+```
+
+The raw `hash` is never returned. The plaintext `secret` is never returned on read.
+
+## Get a single API key
+
+```http
+GET /v1/console/orgs/:orgId/apps/:appId/api-keys/:id
+```
+
+Required capability: `console.api_key.read`.
+
+## Create an API key
+
+```http
+POST /v1/console/orgs/:orgId/apps/:appId/api-keys
+```
+
+Required capability: `console.api_key.write`.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | Yes | Human-readable label (1–255 chars) |
+
+### Response (201)
+
+```json
+{
+  "id": "ak_01HZ...",
+  "name": "Server-side billing job",
+  "prefix": "AbCdEfGh",
+  "secret": "hak_AbCdEfGh...",
+  "createdAt": "2026-05-19T10:00:00.000Z"
+}
+```
+
+<Warning>
+`secret` is returned only here and on rotate. Store it immediately — there is no way to retrieve it later.
+</Warning>
+
+### Example
+
+```bash
+curl -X POST https://api.hyperauth.dev/v1/console/orgs/$ORG/apps/$APP/api-keys \
+  -H "Authorization: Bearer $UCAN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "Server-side billing job" }'
+```
+
+## Rotate an API key
+
+```http
+POST /v1/console/orgs/:orgId/apps/:appId/api-keys/:id/rotate
+```
+
+Required capability: `console.api_key.write`.
+
+Generates a fresh secret and prefix, replaces the stored hash, and resets `lastUsedAt`. The previous secret stops working immediately. The response shape matches create — including the show-once `secret`.
+
+## Delete an API key
+
+```http
+DELETE /v1/console/orgs/:orgId/apps/:appId/api-keys/:id
+```
+
+Required capability: `console.api_key.delete`.
+
+Hard-deletes the API key. Returns `204 No Content`.
