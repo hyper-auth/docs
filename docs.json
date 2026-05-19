@@ -136,6 +136,12 @@
             ]
           },
           {
+            "group": "Console",
+            "pages": [
+              "api-reference/console/events"
+            ]
+          },
+          {
             "group": "Rate Limits",
             "pages": [
               "api-reference/rate-limits"

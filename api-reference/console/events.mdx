@@ -1,0 +1,110 @@
+---
+title: "GET /v1/console/events"
+description: "Server-Sent Events stream of live audit, session, webhook, and credential mutations for the HyperAuth dashboard, authenticated by a short-lived UCAN."
+---
+
+Streams Server-Sent Events (SSE) for a single resource channel so the dashboard can render a live tail of audit entries, session changes, webhook activity, and credential updates without polling. The orchestrator backs the stream with Postgres `LISTEN/NOTIFY` triggers and fans events out to subscribers filtered by `app_id`.
+
+Use this endpoint when you want a "live" view next to a list page in the console — for example, the audit log feed or the active-sessions panel. It is **read-only** and intended for the dashboard, not for end-user-facing apps.
+
+## When to use it
+
+- You are rendering the HyperAuth dashboard and want updates without re-fetching list endpoints.
+- You need a per-`app_id` feed, or an admin feed across all apps.
+- You can tolerate at-most-once delivery with a `rewind-required` sentinel when a subscriber falls behind — the dashboard responds by re-fetching the underlying list.
+
+If you need durable, replayable history, query the corresponding REST resource (`/v1/console/audit-events`, `/v1/console/sessions`, etc.) instead.
+
+## Query parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `channel` | `"audit" \| "sessions" \| "webhooks" \| "credentials"` | Yes | Resource channel to subscribe to. |
+| `app` | `string` | Yes | App ID to scope the stream. Pass `""` (empty string) for an admin stream across all apps. |
+| `token` | `string` | Yes | Base64url-encoded UCAN `InvocationEnvelope`. Must carry the channel-specific capability (see below). |
+| `session` | `string` | Yes | Decimal SBT token id matching the UCAN. |
+
+`EventSource` cannot set custom headers, so the UCAN and session id are passed as query parameters. Mint a **short-lived** UCAN (≤ 5 minutes) scoped to a single channel and app — never reuse a long-lived dashboard UCAN here. Tokens passed in the URL are more likely to appear in proxy logs and browser history than `Authorization` headers, so the orchestrator restricts this pattern to read-only capabilities.
+
+## Required capabilities
+
+Each channel requires a distinct UCAN capability:
+
+| Channel | Capability |
+|---|---|
+| `audit` | `console.events.audit` |
+| `sessions` | `console.events.sessions` |
+| `webhooks` | `console.events.webhooks` |
+| `credentials` | `console.events.credentials` |
+
+## Event types
+
+Every SSE message uses the channel name as its `event:` type and carries a JSON `data:` payload. Two control events have no payload:
+
+| `event` | When | Payload |
+|---|---|---|
+| `audit` / `sessions` / `webhooks` / `credentials` | A row was inserted, updated, or deleted on the matching table. | See payload table below. |
+| `rewind-required` | The subscriber queue overflowed (>1000 buffered events). The server has reset the queue; the client should re-fetch the underlying list and reconcile. | `{}` |
+| `token-expired` | The UCAN's `effectiveExp` passed. The stream closes immediately after this event. | `{}` |
+| *(comment)* `: heartbeat` | Sent every 25 s to keep proxies from closing the connection. | None. |
+
+### Data payloads
+
+Payloads always include `op` (`"insert" \| "update" \| "delete"`), `row_id`, and `timestamp` (epoch seconds). Additional fields per channel:
+
+| Channel | Extra fields |
+|---|---|
+| `audit` | `app_id`, `action`, `resource` |
+| `sessions` | `end_user_id`, `revoked_at` |
+| `webhooks` | `app_id`, `url`, `enabled` |
+| `credentials` | `end_user_id`, `type` |
+
+For `sessions` and `credentials`, the orchestrator resolves `end_user_id → app_id` server-side and only delivers events to subscribers whose `app` matches (or to admin subscribers with `app=""`).
+
+## Example
+
+```ts
+// Mint a 5-minute UCAN scoped to console.events.audit for this app, then:
+const token = base64url(JSON.stringify(invocationEnvelope));
+const url = new URL("https://api.hyperauth.dev/v1/console/events");
+url.searchParams.set("channel", "audit");
+url.searchParams.set("app", appId);
+url.searchParams.set("token", token);
+url.searchParams.set("session", sbtTokenId.toString());
+
+const es = new EventSource(url.toString());
+
+es.addEventListener("audit", (e) => {
+  const row = JSON.parse(e.data);
+  // { op: "insert", app_id, row_id, action, resource, timestamp }
+  appendToLiveTail(row);
+});
+
+es.addEventListener("rewind-required", () => {
+  // Subscriber fell behind — refetch the list and reconcile.
+  refetchAuditList();
+});
+
+es.addEventListener("token-expired", () => {
+  es.close();
+  reconnectWithFreshToken();
+});
+```
+
+## Errors
+
+| Status | `error` | Condition |
+|---|---|---|
+| `400` | `INVALID_CHANNEL` | `channel` is missing or not one of the four valid values. |
+| `401` | `MISSING_UCAN` | `?token` is absent. |
+| `401` | `MISSING_SESSION_SBT` | `?session` is absent. |
+| `401` | `INVALID_SESSION_SBT` | `?session` is not a decimal integer. |
+| `401` | `INVALID_ENVELOPE` | `?token` did not decode as a UCAN `InvocationEnvelope`. |
+| `401` | *(verifier code)* | UCAN signature, expiry, or capability check failed. |
+
+## Operational notes
+
+- One Postgres `LISTEN` connection is opened per channel on the first subscriber and reused for the process lifetime.
+- Per-subscriber queues are bounded at **1000** pending events. Bursts beyond that emit `rewind-required` rather than dropping silently.
+- Heartbeats fire every **25 s** as SSE comments (`: heartbeat`) so intermediaries see traffic on idle streams.
+- The orchestrator enables the `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE` dashboard flag to opt into this stream.
