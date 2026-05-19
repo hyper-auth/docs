@@ -1,6 +1,6 @@
 ---
 title: "POST /api/verify/check"
-description: "Verifies an OTP code for the identifier and returns a signed attestation."
+description: "Verifies a one-time passcode against the user's identifier and returns a signed attestation that the registration endpoint accepts as proof of ownership."
 ---
 
 Verifies an OTP code for the identifier. For email, the code is checked against DO-local SQLite; for SMS, it is checked against Twilio Verify.
