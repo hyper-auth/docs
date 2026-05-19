@@ -1,6 +1,6 @@
 ---
 title: "Changelog"
-description: "New features, updates, and fixes shipping in HyperAuth."
+description: "Weekly release notes for HyperAuth — new features, updates, and bug fixes across the dashboard, widget SDK, orchestrator, and contracts."
 icon: "newspaper"
 ---
 
@@ -8,7 +8,7 @@ icon: "newspaper"
 
 ## New features
 
-**Email-code sign-in for the widget.** `@hyperauth/widget` now supports a Privy-style email-code flow as the entry point for new users. After verifying their email, users enroll a passkey via the vault SharedWorker and receive a Session UCAN. A new `page` widget mode is available alongside `modal`, `drawer`, and `inline` for full-page sign-in routes. See [Authentication](/guides/authentication) and [UI components](/sdk-reference/ui-components).
+**Email-code sign-in for the widget.** `@hyperauth/widget` now supports a Privy-style email-code flow as the entry point for new users. After you verify your email, the widget enrolls a passkey via the vault SharedWorker and issues a Session UCAN. A new `page` widget mode is available alongside `modal`, `drawer`, and `inline` for full-page sign-in routes. See [Authentication](/guides/authentication) and [UI components](/sdk-reference/ui-components).
 
 **Email-verification workflow on the orchestrator.** A new Inngest-driven workflow handles email-code issuance, SMTP delivery via Resend, code validation, rate limiting, and Session UCAN minting. Expired challenges are swept automatically. The orchestrator backs the widget's `/v1/email-code/start` and `/v1/email-code/verify` endpoints.
 
