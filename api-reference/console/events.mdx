@@ -50,16 +50,16 @@ Every SSE message uses the channel name as its `event:` type and carries a JSON 
 
 ### Data payloads
 
-Payloads always include `op` (`"insert" \| "update" \| "delete"`), `row_id`, and `timestamp` (epoch seconds). Additional fields per channel:
+Payloads always include `op` (`"insert" \| "update" \| "delete"`), `row_id`, `timestamp` (epoch seconds), and the routing key for the channel (`app_id` for `audit`/`webhooks`; `end_user_id` for `sessions`/`credentials`). `insert` and `update` events include additional row fields; `delete` events carry only the keys above.
 
-| Channel | Extra fields |
-|---|---|
-| `audit` | `app_id`, `action`, `resource` |
-| `sessions` | `end_user_id`, `revoked_at` |
-| `webhooks` | `app_id`, `url`, `enabled` |
-| `credentials` | `end_user_id`, `type` |
+| Channel | Routing key | Extra fields on `insert` / `update` |
+|---|---|---|
+| `audit` | `app_id` | `action`, `resource` |
+| `sessions` | `end_user_id` | `revoked_at` |
+| `webhooks` | `app_id` | `url`, `enabled` |
+| `credentials` | `end_user_id` | `type` |
 
-For `sessions` and `credentials`, the orchestrator resolves `end_user_id → app_id` server-side and only delivers events to subscribers whose `app` matches (or to admin subscribers with `app=""`).
+For `sessions` and `credentials`, the orchestrator resolves `end_user_id → app_id` server-side (cached for the process lifetime) and only delivers events to subscribers whose `app` matches — or to admin subscribers with `app=""`.
 
 ## Example
 
