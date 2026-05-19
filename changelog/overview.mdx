@@ -8,7 +8,7 @@ icon: "newspaper"
 
 ## New features
 
-**Live event tail for the dashboard.** A new server-sent events stream (`GET /v1/console/events`) pushes audit events, session changes, webhook activity, and credential updates to the dashboard in real time, scoped per app. Connections authenticate with a short-lived (5-minute) UCAN query token and send heartbeats every 25 seconds. If a client falls behind, the server emits a `rewind-required` sentinel so it can resync. Enable it in the dashboard by setting `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE=true`. See [Architecture](/concepts/architecture).
+**Live event tail for the dashboard.** A new server-sent events stream (`GET /v1/console/events`) pushes audit events, session changes, webhook activity, and credential updates to the dashboard in real time, scoped per app via the `channel` and `app` query parameters. Connections authenticate with a short-lived (5-minute) UCAN passed as a query token and send heartbeats every 25 seconds. If a subscriber falls behind its 1000-event queue, the server emits a `rewind-required` sentinel so the client can resync; expired tokens close the stream with a `token-expired` event. Enable it in the dashboard by setting `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE=true`. See [Architecture](/concepts/architecture).
 
 </Update>
 
