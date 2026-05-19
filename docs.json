@@ -39,6 +39,7 @@
             "group": "Guides",
             "pages": [
               "guides/authentication",
+              "guides/nextjs-app-router",
               "guides/smart-accounts",
               "guides/ucan-delegation",
               "guides/vault-management",
@@ -145,7 +146,7 @@
       },
       {
         "tab": "Changelog",
-        "icon": "newspaper",
+        "icon": "rss",
         "groups": [
           {
             "group": "Changelog",

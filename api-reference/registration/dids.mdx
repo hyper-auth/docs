@@ -1,6 +1,6 @@
 ---
 title: "POST /api/dids"
-description: "Registers a DID after the identifier has been verified."
+description: "Registers a new decentralized identifier (DID) on-chain after the user's identifier has been verified via OTP, completing the HyperAuth signup flow."
 ---
 
 Registers a DID after the identifier has been verified. For non-handle channels, an `attestation` object must be present and is validated against the `ATTESTATION_SIGNING_KEY` before the DO call is made.
