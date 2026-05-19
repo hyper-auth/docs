@@ -1,0 +1,121 @@
+---
+title: "Apps Console API"
+description: "Provision and manage environment-scoped apps inside a HyperAuth organization through the UCAN-gated Console API, with examples for each route."
+---
+
+Apps are the unit your end users actually sign in to. Each app is scoped to a single environment (`dev`, `staging`, or `prod`) and lives under exactly one organization. App routes are nested under the organization and require the `console.app.*` capabilities.
+
+Use one app per environment per product. A typical setup has three apps — `acme-web-dev`, `acme-web-staging`, `acme-web-prod` — so you can roll out auth and policy changes without affecting production users.
+
+## List apps
+
+```http
+GET /v1/console/orgs/:orgId/apps
+```
+
+**Capability:** `console.app.read`
+
+### Query parameters
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `page` | integer | `1` | 1-indexed page number |
+| `pageSize` | integer | `25` | Page size (max `100`) |
+
+### Response (200)
+
+```json
+{
+  "rows": [
+    {
+      "id": "app_01HABCDEF…",
+      "orgId": "org_01HABCDEF…",
+      "name": "Acme Web",
+      "slug": "acme-web-prod",
+      "environment": "prod",
+      "tbAccountId": null,
+      "createdAt": "2026-05-12T18:00:00.000Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+`tbAccountId` is the TigerBeetle ledger account id used for usage and billing. It is `null` until the TigerBeetle bridge populates it.
+
+## Get an app
+
+```http
+GET /v1/console/orgs/:orgId/apps/:id
+```
+
+**Capability:** `console.app.read`
+
+Returns the app row, or `404` if the app does not belong to the given org.
+
+## Create an app
+
+```http
+POST /v1/console/orgs/:orgId/apps
+```
+
+**Capability:** `console.app.write`
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | Yes | Display name |
+| `slug` | string | Yes | URL-safe identifier, unique within the org |
+| `environment` | `"dev" \| "staging" \| "prod"` | Yes | Environment tier |
+
+### Example
+
+```bash
+curl -X POST https://api.hyperauth.dev/v1/console/orgs/org_01.../apps \
+  -H "Authorization: UCAN $UCAN_ENVELOPE_B64URL" \
+  -H "X-Session-Sbt: $SESSION_SBT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Acme Web",
+    "slug": "acme-web-prod",
+    "environment": "prod"
+  }'
+```
+
+### Response (201)
+
+Returns the created app row. The orchestrator generates the id (`app_<ulid>`) and `createdAt`.
+
+## Update an app
+
+```http
+PATCH /v1/console/orgs/:orgId/apps/:id
+```
+
+**Capability:** `console.app.write`
+
+### Request body
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | string | New display name |
+| `environment` | `"dev" \| "staging" \| "prod"` | Move the app between environments |
+
+`slug` is immutable after creation. To rename an app's slug, create a new app and migrate.
+
+Returns the updated app, or `404` if the app does not belong to the given org.
+
+## Delete an app
+
+```http
+DELETE /v1/console/orgs/:orgId/apps/:id
+```
+
+**Capability:** `console.app.delete`
+
+Hard-deletes the app row. Returns `204 No Content`.
+
+<Warning>
+  Deleting an app removes its row immediately. The deletion is recorded in `audit_events` — the deleted app id is preserved under `metadata.changes.id` so the audit trail stays intact even though the foreign key is gone.
+</Warning>

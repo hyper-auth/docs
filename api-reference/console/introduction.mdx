@@ -1,0 +1,91 @@
+---
+title: "Console API overview"
+description: "Use the UCAN-gated HyperAuth Console API to manage organizations, members, and apps from the dashboard or your own admin tooling, with audited writes."
+icon: "shield-halved"
+---
+
+The Console API is the orchestrator's control-plane surface, mounted under `/v1/console/*`. It powers the HyperAuth dashboard and is available to any operator tool that can present a valid Session UCAN.
+
+Use it to provision and manage the resources that scope every other HyperAuth operation: **organizations**, **members**, and **apps**.
+
+## When to use the Console API
+
+Reach for these endpoints when you need to:
+
+- Create and rename organizations, change plans, or soft-archive them.
+- Invite, update, or remove team members on an organization.
+- Provision apps for `dev`, `staging`, or `prod` environments.
+- Build admin tooling on top of the same surface the dashboard uses.
+
+Other endpoint groups serve end-user authentication, sessions, and payments. The Console API only covers operator and admin actions.
+
+## Base URL
+
+```
+https://api.hyperauth.dev/v1/console
+```
+
+All responses use `application/json`. Mutations are written inside a transaction that also emits an `audit_events` row, so every successful write is recorded against the calling principal.
+
+## Authentication
+
+Every Console route is gated by a UCAN capability check. Each request must include both of these headers:
+
+| Header | Format | Description |
+|---|---|---|
+| `Authorization` | `UCAN <envelope>` | Base64url-encoded JSON `InvocationEnvelope` |
+| `X-Session-Sbt` | `<decimal>` | The Session SBT token id bound to the UCAN |
+
+The orchestrator decodes the envelope, verifies the invocation against the expected Session SBT and command, and only then dispatches the route handler.
+
+```bash
+curl https://api.hyperauth.dev/v1/console/orgs \
+  -H "Authorization: UCAN $UCAN_ENVELOPE_B64URL" \
+  -H "X-Session-Sbt: 1234567890"
+```
+
+### Capabilities
+
+Each route requires a specific capability string in the UCAN invocation's `cmd` field. If the capability does not match, the request is rejected with `401`.
+
+| Resource | Read | Write | Delete |
+|---|---|---|---|
+| Organization | `console.org.read` | `console.org.write` | `console.org.delete` |
+| Member | `console.member.read` | `console.member.write` | `console.member.delete` |
+| App | `console.app.read` | `console.app.write` | `console.app.delete` |
+
+`write` capabilities cover both `POST` (create) and `PATCH` (update). `delete` is required for `DELETE`.
+
+### Auth errors
+
+All auth failures return `401` with a JSON body of `{ "error": "<code>", "message": "<human-readable>" }`.
+
+| `error` | Condition |
+|---|---|
+| `MISSING_UCAN` | `Authorization` header absent or not prefixed with `UCAN ` |
+| `MISSING_SESSION_SBT` | `X-Session-Sbt` header absent |
+| `INVALID_SESSION_SBT` | `X-Session-Sbt` is not a decimal integer |
+| `INVALID_ENVELOPE` | UCAN envelope failed to decode or parse |
+| Verifier code | Invocation failed signature, expiry, scope, or command checks |
+
+## Conventions
+
+- **IDs** are ULID-suffixed strings: orgs use `org_…`, members `mem_…`, apps `app_…`.
+- **Timestamps** are ISO-8601 strings in responses; `Date` values written through `PATCH` should also be ISO-8601.
+- **Pagination** on list endpoints uses `?page=<n>&pageSize=<n>` query params. `page` defaults to `1`, `pageSize` defaults to `25` and is capped at `100`. Responses have the shape `{ "rows": [...], "total": <number> }`.
+- **Soft delete** is used for organizations (`DELETE /orgs/:id` sets `archivedAt`). Members and apps are hard-deleted.
+- **Audit trail.** Every successful create, update, or delete writes an `audit_events` row. App deletes preserve the deleted id under `metadata.changes.id` because the foreign key would otherwise be unsatisfiable.
+
+## Resources
+
+<CardGroup cols={3}>
+  <Card title="Organizations" icon="building" href="/api-reference/console/orgs">
+    Top-level tenant. Owns members and apps.
+  </Card>
+  <Card title="Members" icon="users" href="/api-reference/console/members">
+    Team members of an organization, with roles.
+  </Card>
+  <Card title="Apps" icon="grid-2" href="/api-reference/console/apps">
+    Environment-scoped apps that end users sign in to.
+  </Card>
+</CardGroup>
