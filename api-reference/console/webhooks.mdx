@@ -1,0 +1,133 @@
+---
+title: "Console: Webhooks"
+description: "Configure webhook endpoints for an app, manage event subscriptions, and rotate signing secrets. Secrets are returned once on create and rotate."
+---
+
+Manage outbound webhook endpoints for an app. Each endpoint subscribes to a list of event types and is signed with a per-endpoint secret. The plaintext signing secret is returned only on create and rotate.
+
+Webhook signing secrets use the `whsec_` prefix and `sha256` hashing.
+
+## List webhooks
+
+```http
+GET /v1/console/orgs/:orgId/apps/:appId/webhooks
+```
+
+Required capability: `console.webhook.read`.
+
+### Query parameters
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `page` | integer | `1` | 1-indexed page number |
+| `pageSize` | integer | `25` | Max `100` |
+
+### Response (200)
+
+```json
+{
+  "rows": [
+    {
+      "id": "wh_01HZ...",
+      "appId": "app_01H...",
+      "url": "https://example.com/hooks/hyperauth",
+      "events": ["session.created", "session.revoked"],
+      "enabled": true,
+      "createdAt": "2026-05-19T10:00:00.000Z",
+      "lastDeliveryAt": "2026-05-19T11:32:08.000Z",
+      "lastStatus": 200
+    }
+  ],
+  "total": 1
+}
+```
+
+## Get a single webhook
+
+```http
+GET /v1/console/orgs/:orgId/apps/:appId/webhooks/:id
+```
+
+Required capability: `console.webhook.read`.
+
+## Create a webhook
+
+```http
+POST /v1/console/orgs/:orgId/apps/:appId/webhooks
+```
+
+Required capability: `console.webhook.write`.
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `url` | string (URL) | Yes | Destination endpoint. Must be a valid URL. |
+| `events` | string[] | Yes | At least one event type to subscribe to |
+
+### Response (201)
+
+```json
+{
+  "id": "wh_01HZ...",
+  "url": "https://example.com/hooks/hyperauth",
+  "events": ["session.created"],
+  "enabled": true,
+  "secret": "whsec_AbCdEfGh...",
+  "createdAt": "2026-05-19T10:00:00.000Z"
+}
+```
+
+<Warning>
+`secret` is returned only here and on rotate. Use it to verify HMAC signatures on incoming deliveries — there is no way to retrieve it later.
+</Warning>
+
+### Example
+
+```bash
+curl -X POST https://api.hyperauth.dev/v1/console/orgs/$ORG/apps/$APP/webhooks \
+  -H "Authorization: Bearer $UCAN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/hooks/hyperauth",
+    "events": ["session.created", "session.revoked"]
+  }'
+```
+
+## Update a webhook
+
+```http
+PATCH /v1/console/orgs/:orgId/apps/:appId/webhooks/:id
+```
+
+Required capability: `console.webhook.write`.
+
+### Request body
+
+| Field | Type | Description |
+|---|---|---|
+| `url` | string (URL) | New destination |
+| `events` | string[] | Replacement event list (must be non-empty) |
+| `enabled` | boolean | Pause or resume deliveries |
+
+All fields are optional; only provided fields are updated. Unknown fields return `400 validation_error`.
+
+## Rotate the signing secret
+
+```http
+POST /v1/console/orgs/:orgId/apps/:appId/webhooks/:id/rotate-secret
+```
+
+Required capability: `console.webhook.write`.
+
+Generates a new signing secret. Future deliveries are signed with the new value; the previous secret stops working immediately. The response includes the show-once `secret`.
+
+## Delete a webhook
+
+```http
+DELETE /v1/console/orgs/:orgId/apps/:appId/webhooks/:id
+```
+
+Required capability: `console.webhook.delete`.
+
+Hard-deletes the webhook. Returns `204 No Content`.

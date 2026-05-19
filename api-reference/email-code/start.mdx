@@ -1,0 +1,68 @@
+---
+title: "POST /v1/email-code/start"
+description: "Begin an email-code challenge for a sign-in. Generates a 6-digit code, sends it via Resend, and rate-limits by email and app."
+---
+
+Begins an email-code challenge. The orchestrator creates a challenge row, hashes a fresh 6-digit code, fires an Inngest event that delivers the code via Resend, and returns the `challenge_id` your client uses to verify.
+
+This is a public endpoint — no UCAN required. Requests are rate-limited per `(email, app_id)` bucket.
+
+## Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `app_id` | string | Yes | The app the user is signing into |
+| `email` | string (email) | Yes | Email address to challenge |
+
+## Response (200)
+
+```json
+{
+  "challenge_id": "01HZ...",
+  "request_id": "01HZ...",
+  "expires_at": 1747654800,
+  "resend_after": 1747651230
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `challenge_id` | string (ULID) | Opaque id passed to `/v1/email-code/verify` |
+| `request_id` | string (ULID) | Correlation id for logs and audit |
+| `expires_at` | integer | Unix timestamp (seconds) when the code expires (default 90s after creation) |
+| `resend_after` | integer | Unix timestamp (seconds) before which a second `start` for the same email is throttled |
+
+## Rate limiting
+
+Requests are bucketed by `email:<email>:<app_id>` with a 1-hour rolling window. The window cap is `EMAIL_CODE_MAX_ATTEMPTS` (default `5`). Exceeding it returns:
+
+```http
+HTTP/1.1 429 Too Many Requests
+```
+
+```json
+{ "error": "rate_limited", "message": "Too many requests. Try again later." }
+```
+
+## Errors
+
+| Code | `error` | Condition |
+|---|---|---|
+| `400` | `validation_error` | Body is not valid JSON, or missing `app_id` / invalid `email` |
+| `429` | `rate_limited` | Bucket exhausted for the current 1-hour window |
+
+## Example
+
+```bash
+curl -X POST https://api.hyperauth.dev/v1/email-code/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "app_id": "app_01H...",
+    "email": "alice@example.com"
+  }'
+```
+
+## Notes
+
+- Code TTL is governed by `EMAIL_CODE_TTL_SEC` (default `90` seconds).
+- Inngest delivery failures are non-fatal for the HTTP response — the challenge row is committed and the client can rely on the returned `challenge_id`. If the email never arrives, start a new challenge after `resend_after`.
