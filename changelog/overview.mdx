@@ -4,7 +4,15 @@ description: "Weekly release notes covering new features, updates, and bug fixes
 icon: "rss"
 ---
 
-<Update label="May 18, 2026" tags={["sdk", "backend", "contracts", "dashboard"]}>
+<Update label="May 19, 2026" tags={["dashboard", "orchestrator"]}>
+
+## New features
+
+**Live event tail for the dashboard.** A new server-sent events stream (`GET /v1/console/events`) pushes audit events, session changes, webhook activity, and credential updates to the dashboard in real time. Streams are scoped per app via the `channel` and `app` query parameters. Connections authenticate with a short-lived (5-minute) UCAN passed as a query token and send heartbeats every 25 seconds. If a subscriber falls behind its 1000-event queue, the server emits a `rewind-required` sentinel so the client can resync. Expired tokens close the stream with a `token-expired` event. Enable it in the dashboard by setting `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE=true`. See [Architecture](/concepts/architecture).
+
+</Update>
+
+<Update label="May 12, 2026" tags={["dashboard", "sdk", "orchestrator", "contracts"]}>
 
 ## New features
 
