@@ -1,6 +1,6 @@
 ---
 title: "POST /api/sessions"
-description: "Creates a registration session for an identifier. Checks reserved identifiers, duplicate registrations, and per-IP registration limits before writing to D1."
+description: "Creates a registration session for an identifier after enforcing reserved-name, duplicate-DID, and per-IP rate-limit checks against the D1 database."
 ---
 
 Creates a registration session for an identifier. Checks reserved identifiers, duplicate registrations, and per-IP registration limits before writing to D1.
