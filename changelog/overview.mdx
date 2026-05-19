@@ -1,6 +1,6 @@
 ---
 title: "Changelog"
-description: "Weekly release notes for HyperAuth, covering new features, updates, and bug fixes across the dashboard, widget SDK, orchestrator, and smart contracts."
+description: "Weekly HyperAuth release notes covering new features, updates, and fixes across the dashboard, widget SDK, orchestrator, and smart contracts."
 icon: "newspaper"
 ---
 
@@ -10,7 +10,7 @@ icon: "newspaper"
 
 **Real-time event stream for the dashboard.** The orchestrator now exposes a server-sent events endpoint at `GET /v1/console/events` that streams live mutations to `audit_events`, `sessions`, `webhooks`, and `credentials`. Events are scoped per app, authenticated via a short-lived UCAN passed as a query token, and include 25-second heartbeats. When a client falls too far behind, it receives a `rewind-required` sentinel so it can resync. Enable it in the dashboard with `NEXT_PUBLIC_HYPERAUTH_ENABLE_LIVE=true`.
 
-**Audit log ↔ ledger cross-references.** Audit events now link to their underlying TigerBeetle transfers and session budget accounts. The console audit list response includes a new `tb_link.transferId` field on each event where a transfer exists, powering a "view ledger entry" affordance in the dashboard. Lookups work in both directions: each transfer encodes its `audit_events.id` UUID as a 128-bit integer in `user_data_128`, and each audit row stores the raw transfer ID in `tb_transfer_id`, so you can trace any payment intent step from an audit row to the ledger entry and back even if one side fails mid-flight.
+**Audit log ↔ ledger cross-references.** Audit events now link to their underlying TigerBeetle transfers and session budget accounts. The console audit list response includes a new `tb_link.transferId` field on each event where a transfer exists, powering a "view ledger entry" affordance in the dashboard. Lookups work in both directions: each transfer encodes its `audit_events.id` UUID as a 128-bit integer in `user_data_128`, and each audit row stores the raw transfer ID in `tb_transfer_id`. You can trace any payment intent step from an audit row to the ledger entry and back, even if one side fails mid-flight.
 
 ## Updates
 
