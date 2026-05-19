@@ -1,0 +1,122 @@
+---
+title: "Members"
+description: "Manage organization team members and roles through the UCAN-gated Console API."
+---
+
+Members are the human operators on an organization. Each member has a role that controls what they can do inside the dashboard. Member routes are nested under their organization and require the `console.member.*` capabilities.
+
+Roles:
+
+| Role | Description |
+|---|---|
+| `owner` | Full control, including billing and org deletion |
+| `admin` | Manage apps, members, and policies; no billing |
+| `developer` | Read and configure apps; no member or billing changes |
+
+## List members
+
+```http
+GET /v1/console/orgs/:orgId/members
+```
+
+**Capability:** `console.member.read`
+
+### Query parameters
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `page` | integer | `1` | 1-indexed page number |
+| `pageSize` | integer | `25` | Page size (max `100`) |
+
+### Response (200)
+
+```json
+{
+  "rows": [
+    {
+      "id": "mem_01HABCDEF…",
+      "orgId": "org_01HABCDEF…",
+      "userId": "did:key:z6Mk…",
+      "email": "alice@acme.com",
+      "displayName": "Alice",
+      "role": "admin",
+      "invitedAt": "2026-05-12T18:00:00.000Z",
+      "acceptedAt": "2026-05-13T09:24:00.000Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+## Get a member
+
+```http
+GET /v1/console/orgs/:orgId/members/:id
+```
+
+**Capability:** `console.member.read`
+
+Returns the member row, or `404` if the member does not belong to the given org.
+
+## Invite a member
+
+```http
+POST /v1/console/orgs/:orgId/members
+```
+
+**Capability:** `console.member.write`
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `userId` | string | Yes | The invitee's HyperAuth user id (DID) |
+| `email` | string | Yes | Email address used for notifications |
+| `displayName` | string | No | Optional display name |
+| `role` | `"owner" \| "admin" \| "developer"` | Yes | Role granted at acceptance |
+
+### Example
+
+```bash
+curl -X POST https://api.hyperauth.dev/v1/console/orgs/org_01.../members \
+  -H "Authorization: UCAN $UCAN_ENVELOPE_B64URL" \
+  -H "X-Session-Sbt: $SESSION_SBT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "did:key:z6Mk…",
+    "email": "alice@acme.com",
+    "displayName": "Alice",
+    "role": "admin"
+  }'
+```
+
+### Response (201)
+
+Returns the created member row. `invitedAt` is stamped server-side; `acceptedAt` is `null` until the invitee accepts.
+
+## Update a member
+
+```http
+PATCH /v1/console/orgs/:orgId/members/:id
+```
+
+**Capability:** `console.member.write`
+
+### Request body
+
+| Field | Type | Description |
+|---|---|---|
+| `role` | `"owner" \| "admin" \| "developer"` | Change the member's role |
+| `acceptedAt` | ISO-8601 string \| `null` | Set or clear the acceptance timestamp |
+
+Returns the updated member, or `404` if the member does not belong to the given org.
+
+## Remove a member
+
+```http
+DELETE /v1/console/orgs/:orgId/members/:id
+```
+
+**Capability:** `console.member.delete`
+
+Hard-deletes the member row. Returns `204 No Content`.

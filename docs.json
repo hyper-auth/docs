@@ -118,6 +118,15 @@
             ]
           },
           {
+            "group": "Console",
+            "pages": [
+              "api-reference/console/introduction",
+              "api-reference/console/orgs",
+              "api-reference/console/members",
+              "api-reference/console/apps"
+            ]
+          },
+          {
             "group": "Indexer",
             "pages": [
               "api-reference/indexer/proxy"

@@ -1,0 +1,119 @@
+---
+title: "Organizations"
+description: "Create, list, update, and soft-archive organizations through the UCAN-gated Console API."
+---
+
+Organizations are the top-level tenant in HyperAuth. They own members and apps. Org routes require the `console.org.*` capabilities.
+
+## List organizations
+
+```http
+GET /v1/console/orgs
+```
+
+**Capability:** `console.org.read`
+
+### Query parameters
+
+| Param | Type | Default | Description |
+|---|---|---|---|
+| `page` | integer | `1` | 1-indexed page number |
+| `pageSize` | integer | `25` | Page size (max `100`) |
+| `filter` | string | — | Case-sensitive `LIKE %filter%` match on `name` or `slug` |
+
+### Response (200)
+
+```json
+{
+  "rows": [
+    {
+      "id": "org_01HABCDEF…",
+      "slug": "acme",
+      "name": "Acme, Inc.",
+      "plan": "pro",
+      "avatarUrl": null,
+      "createdAt": "2026-05-12T18:00:00.000Z",
+      "archivedAt": null
+    }
+  ],
+  "total": 1
+}
+```
+
+## Get an organization
+
+```http
+GET /v1/console/orgs/:id
+```
+
+**Capability:** `console.org.read`
+
+Returns the org row or `404` `{ "error": "NOT_FOUND" }` if no org with that id exists.
+
+## Create an organization
+
+```http
+POST /v1/console/orgs
+```
+
+**Capability:** `console.org.write`
+
+### Request body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `slug` | string | Yes | URL-safe identifier, unique across the platform |
+| `name` | string | Yes | Display name |
+| `plan` | `"free" \| "pro" \| "enterprise"` | No | Defaults to `"free"` |
+| `avatarUrl` | string | No | Public URL to an avatar image |
+
+### Example
+
+```bash
+curl -X POST https://api.hyperauth.dev/v1/console/orgs \
+  -H "Authorization: UCAN $UCAN_ENVELOPE_B64URL" \
+  -H "X-Session-Sbt: $SESSION_SBT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "slug": "acme",
+    "name": "Acme, Inc.",
+    "plan": "pro"
+  }'
+```
+
+### Response (201)
+
+Returns the full created row. The orchestrator generates the id (`org_<ulid>`) and `createdAt`.
+
+## Update an organization
+
+```http
+PATCH /v1/console/orgs/:id
+```
+
+**Capability:** `console.org.write`
+
+### Request body
+
+All fields are optional; only the provided fields are patched.
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | string | New display name |
+| `plan` | `"free" \| "pro" \| "enterprise"` | Change billing plan |
+| `avatarUrl` | string | Replace avatar URL |
+| `archivedAt` | ISO-8601 string \| `null` | Manually set or clear the archive timestamp |
+
+Returns the updated row, or `404` if the org does not exist.
+
+## Archive an organization
+
+```http
+DELETE /v1/console/orgs/:id
+```
+
+**Capability:** `console.org.delete`
+
+Soft-deletes the org by setting `archivedAt = now()`. The row is preserved so members and apps remain auditable. Returns the updated row or `404`.
+
+To restore an archived org, call `PATCH /v1/console/orgs/:id` with `{ "archivedAt": null }`.

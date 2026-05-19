@@ -14,6 +14,8 @@ icon: "newspaper"
 
 **HyperAuth dashboard preview.** The console app is live in preview, with pages for apps, auth methods, branding, policies, users, sessions, credentials, API keys, webhooks, audit logs, team, and billing. Onboarding walks new operators through their first app. Pages render against a stable data boundary, with live `/v1/console/*` endpoints rolling out per resource.
 
+**Console API foundation: orgs, members, and apps.** The orchestrator now serves UCAN-gated `/v1/console/*` routes for the three foundational resources: organizations, members, and apps. Every request is authorized by a UCAN invocation plus a `X-Session-Sbt` header, and every write is recorded to `audit_events` in the same transaction as the mutation. See the new [Console API reference](/api-reference/console/introduction) for endpoints, capabilities, and request shapes.
+
 ## Updates
 
 **SDK plumbing in the dashboard.** The dashboard now mounts `@hyperauth/client` and `@hyperauth/react` providers and emits the required Content Security Policy headers for the vault SharedWorker. Auth pages (`login`, `signup`, `verify-email`, `forgot-password`, `reset-password`, `onboarding`) are wired against the SDK provider tree.
