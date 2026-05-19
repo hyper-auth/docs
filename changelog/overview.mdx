@@ -14,7 +14,7 @@ icon: "newspaper"
 
 **HyperAuth dashboard preview.** The console app is live in preview, with pages for apps, auth methods, branding, policies, users, sessions, credentials, API keys, webhooks, audit logs, team, and billing. Onboarding walks new operators through their first app. Pages render against a stable data boundary, with live `/v1/console/*` endpoints rolling out per resource.
 
-**Audit log ↔ ledger cross-reference.** Payment-related audit events are now linked to the TigerBeetle transfers they describe, so you can pivot from a transfer to its full audit context (or the reverse) for forensic review. Each settlement writes two audit rows — one for the funds hold (`transfer.funds_hold`) and one for the settlement (`transfer.settle`) — and the console audit-events API exposes the link via a new `tb_link` field on every row:
+**Audit log ↔ ledger cross-reference.** Payment audit events now link to the TigerBeetle transfers they describe, so you can pivot from a transfer to its audit context (or the reverse) for forensic review. Each settlement writes two audit rows: one for the funds hold (`transfer.funds_hold`) and one for the settlement (`transfer.settle`). The console audit-events API exposes the link via a new `tb_link` field on every row:
 
 ```json
 {
@@ -26,7 +26,7 @@ icon: "newspaper"
 }
 ```
 
-Rows for non-ledger events return `tb_link: null`. The link is bidirectional: each TigerBeetle transfer encodes its audit-event UUID in `user_data_128`, so a transfer can always be resolved back to its audit row even if a downstream write fails.
+Rows for non-ledger events return `tb_link: null`. The link is bidirectional: each TigerBeetle transfer encodes its audit-event UUID in `user_data_128`, so you can always resolve a transfer back to its audit row.
 
 ## Updates
 
