@@ -4,6 +4,18 @@ description: "Weekly release notes for HyperAuth, covering new features, updates
 icon: "newspaper"
 ---
 
+<Update label="May 19, 2026" tags={["orchestrator"]}>
+
+## Updates
+
+**Prometheus metrics endpoint on the orchestrator.** Self-hosted deployments can now scrape `GET /metrics` for database query counts, query-duration histograms, connection-pool acquire waits, and total connections. The endpoint emits standard Prometheus text exposition and is intended for in-cluster scraping.
+
+**Automatic audit-log partition management.** The orchestrator now extends `audit_events` monthly partitions automatically via a scheduled Inngest job, with coverage pre-provisioned through February 2027. Operators no longer need to roll partitions by hand to keep audit ingestion healthy.
+
+**Postgres operations runbook.** A new runbook documents connection topology, backups, migrations, the partition cron, observability, and the decommission gate for teams running HyperAuth themselves. See [Deploy](/guides/deploy).
+
+</Update>
+
 <Update label="May 19, 2026" tags={["dashboard", "sdk", "orchestrator", "contracts"]}>
 
 ## New features
